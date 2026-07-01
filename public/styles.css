@@ -266,3 +266,97 @@ button:hover {
     max-height: none;
   }
 }
+
+@media (max-width: 640px) {
+  body {
+    background:
+      linear-gradient(160deg, rgba(5, 8, 22, 0.96), rgba(15, 24, 63, 0.98)),
+      var(--bg-1);
+  }
+
+  .app-shell {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px;
+    gap: 12px;
+  }
+
+  .hero,
+  .card {
+    border-radius: 10px;
+    padding: 14px;
+  }
+
+  .hero h1 {
+    font-size: 1.95rem;
+    letter-spacing: 0.03em;
+    margin-bottom: 8px;
+    overflow-wrap: anywhere;
+  }
+
+  h2 {
+    font-size: 1.18rem;
+    line-height: 1.2;
+  }
+
+  input,
+  select,
+  button {
+    width: 100%;
+    box-sizing: border-box;
+    min-height: 44px;
+  }
+
+  #active-bets-list,
+  #proposals-list,
+  #participants-list {
+    padding-left: 0;
+    list-style: none;
+  }
+
+  .inline-counter-form {
+    grid-template-columns: 1fr;
+  }
+
+  .counter-button {
+    justify-self: stretch;
+  }
+
+  .notifications-top {
+    min-height: auto;
+  }
+
+  .notification-details {
+    font-size: 0.95rem;
+    overflow-wrap: anywhere;
+  }
+
+  .notification-title {
+    overflow-wrap: anywhere;
+  }
+
+  .hero p,
+  .hint,
+  #bet-message,
+  #user-message,
+  .notification-status {
+    font-size: 0.95rem;
+    line-height: 1.35;
+  }
+
+  label {
+    font-size: 0.95rem;
+  }
+
+  #active-bets-list li,
+  #proposals-list li,
+  #participants-list li,
+  .match-item {
+    border-radius: 8px;
+    padding: 9px;
+  }
+
+  .top-grid {
+    gap: 12px;
+  }
+}
