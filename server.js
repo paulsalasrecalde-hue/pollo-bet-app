@@ -1,8 +1,12 @@
 const express = require('express');
+const crypto = require('crypto');
+const { Pool } = require('pg');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ALLOW_LIVE_MATCH_BETS = true;
 const ADMIN_CODE = process.env.ADMIN_CODE || 'pollo2026';
+const PIN_SECRET = process.env.PIN_SECRET || ADMIN_CODE;
+const DATABASE_URL = process.env.DATABASE_URL || '';
 
 app.use(express.json());
 app.use((req, res, next) => {
@@ -21,6 +25,70 @@ let notificationClients = new Set();
 let activeResetDate = getLocalDateKey();
 
 const matches = [];
+const db = DATABASE_URL
+  ? new Pool({
+      connectionString: DATABASE_URL,
+      ssl: DATABASE_URL.includes('localhost') || DATABASE_URL.includes('127.0.0.1')
+        ? false
+        : { rejectUnauthorized: false }
+    })
+  : null;
+
+async function initDatabase() {
+  if (!db) {
+    return;
+  }
+
+  await db.query(`
+    create table if not exists app_data (
+      key text primary key,
+      value jsonb not null,
+      updated_at timestamptz not null default now()
+    )
+  `);
+
+  const { rows } = await db.query('select key, value from app_data');
+  const state = Object.fromEntries(rows.map((row) => [row.key, row.value]));
+
+  users = Array.isArray(state.users) ? state.users : users;
+  bets = Array.isArray(state.bets) ? state.bets : bets;
+  notifications = Array.isArray(state.notifications) ? state.notifications : notifications;
+  winnerHistory = Array.isArray(state.winnerHistory) ? state.winnerHistory : winnerHistory;
+  activeResetDate = state.activeResetDate || activeResetDate;
+
+  await persistState(['users', 'bets', 'notifications', 'winnerHistory', 'activeResetDate']);
+}
+
+async function saveState(key, value) {
+  if (!db) {
+    return;
+  }
+
+  await db.query(
+    `insert into app_data (key, value, updated_at)
+     values ($1, $2::jsonb, now())
+     on conflict (key) do update set value = excluded.value, updated_at = now()`,
+    [key, JSON.stringify(value)]
+  );
+}
+
+async function persistState(keys) {
+  if (!db) {
+    return;
+  }
+
+  const values = {
+    users,
+    bets,
+    notifications,
+    winnerHistory,
+    activeResetDate
+  };
+
+  for (const key of keys) {
+    await saveState(key, values[key]);
+  }
+}
 
 function isAdminCodeValid(value) {
   return String(value || '') === ADMIN_CODE;
@@ -33,28 +101,32 @@ function getLocalDateKey(value = new Date()) {
   return `${year}-${month}-${day}`;
 }
 
-function ensureDailyReset() {
+async function ensureDailyReset() {
   const todayKey = getLocalDateKey();
   if (todayKey === activeResetDate) {
     return;
   }
 
-  users = [];
   bets = [];
   notifications = [];
   activeResetDate = todayKey;
+  await persistState(['bets', 'notifications', 'activeResetDate']);
 
   broadcastNotification({
     id: `daily-reset-${Date.now()}`,
     type: 'daily-reset',
-    message: 'Las apuestas se reiniciaron por cambio de día.',
+    message: 'Las apuestas se reiniciaron por cambio de dia.',
     createdAt: new Date().toISOString()
   });
 }
 
-app.use('/api', (_req, _res, next) => {
-  ensureDailyReset();
-  next();
+app.use('/api', async (_req, _res, next) => {
+  try {
+    await ensureDailyReset();
+    next();
+  } catch (error) {
+    next(error);
+  }
 });
 
 function normalizeMatchText(value) {
@@ -250,6 +322,64 @@ function getWinnerRowsForResponse() {
   return [...winnerHistory, ...pendingRows];
 }
 
+function validatePin(pin) {
+  return /^\d{4}$/.test(String(pin || ''));
+}
+
+function hashPin(pin) {
+  return crypto.createHash('sha256').update(`${PIN_SECRET}:${pin}`).digest('hex');
+}
+
+function publicUser(user) {
+  return {
+    id: user.id,
+    name: user.name
+  };
+}
+
+async function getOrCreateUser(name, pin) {
+  const normalizedName = String(name || '').trim();
+
+  if (!normalizedName) {
+    const error = new Error('El nombre es obligatorio.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!validatePin(pin)) {
+    const error = new Error('El PIN debe tener 4 numeros.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const pinHash = hashPin(pin);
+  let user = users.find((item) => item.name.toLowerCase() === normalizedName.toLowerCase());
+
+  if (user) {
+    if (user.pinHash && user.pinHash !== pinHash) {
+      const error = new Error('PIN incorrecto para ese nombre.');
+      error.statusCode = 401;
+      throw error;
+    }
+
+    if (!user.pinHash) {
+      user.pinHash = pinHash;
+      await persistState(['users']);
+    }
+
+    return user;
+  }
+
+  user = {
+    id: Date.now().toString(),
+    name: normalizedName,
+    pinHash
+  };
+  users.push(user);
+  await persistState(['users']);
+  return user;
+}
+
 async function getMatchAvailability(matchId) {
   const date = getEspnDate();
 
@@ -316,27 +446,19 @@ app.get('/api/health', (_req, res) => {
   res.json({ ok: true, service: 'pollo-bet-app' });
 });
 
-app.post('/api/register', (req, res) => {
-  const { name } = req.body;
+app.post('/api/register', async (req, res) => {
+  try {
+    const user = await getOrCreateUser(req.body.name, req.body.pin);
 
-  if (!name || !name.trim()) {
-    return res.status(400).json({ error: 'El nombre es obligatorio.' });
+    res.json({
+      user: publicUser(user),
+      blockedByRound: false,
+      blockedStarter: null,
+      requiresNewStarter: false
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ error: error.message || 'No se pudo registrar el usuario.' });
   }
-
-  const normalizedName = name.trim();
-  let user = users.find((item) => item.name.toLowerCase() === normalizedName.toLowerCase());
-
-  if (!user) {
-    user = { id: Date.now().toString(), name: normalizedName };
-    users.push(user);
-  }
-
-  res.json({
-    user,
-    blockedByRound: false,
-    blockedStarter: null,
-    requiresNewStarter: false
-  });
 });
 
 app.get('/api/matches', (_req, res) => {
@@ -405,13 +527,17 @@ app.get('/api/participants', (_req, res) => {
 });
 
 app.post('/api/bets', async (req, res) => {
-  const { userName, matchId, teamName, amount } = req.body;
+  const { userName, pin, matchId, teamName, amount } = req.body;
   const matchText = String(matchId || '').trim();
   const teamText = String(teamName || '').trim();
   const amountValue = Number(amount);
 
   if (!userName || !matchText || !teamText || !amountValue || amountValue <= 0) {
-    return res.status(400).json({ error: 'Faltan datos válidos para crear la apuesta.' });
+    return res.status(400).json({ error: 'Faltan datos validos para crear la apuesta.' });
+  }
+
+  if (!validatePin(pin)) {
+    return res.status(400).json({ error: 'El PIN debe tener 4 numeros.' });
   }
 
   const availability = await getMatchAvailability(matchText);
@@ -419,10 +545,11 @@ app.post('/api/bets', async (req, res) => {
     return res.status(400).json({ error: 'Este partido ya inició o finalizó. Ya no se pueden hacer apuestas.' });
   }
 
-  let user = users.find((item) => item.name.toLowerCase() === userName.toLowerCase());
-  if (!user) {
-    user = { id: Date.now().toString(), name: userName.trim() };
-    users.push(user);
+  let user;
+  try {
+    user = await getOrCreateUser(userName, pin);
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ error: error.message || 'No se pudo validar el usuario.' });
   }
 
   const bet = {
@@ -454,22 +581,28 @@ app.post('/api/bets', async (req, res) => {
   };
 
   notifications.unshift(notification);
+  await persistState(['users', 'bets', 'notifications']);
   broadcastNotification(notification);
 
   res.json({ bet, notification });
 });
 
 app.post('/api/counter-bets', async (req, res) => {
-  const { userName, challengeId } = req.body;
+  const { userName, pin, challengeId } = req.body;
 
   if (!userName || !challengeId) {
-    return res.status(400).json({ error: 'Faltan datos válidos para aceptar el reto.' });
+    return res.status(400).json({ error: 'Faltan datos validos para aceptar el reto.' });
   }
 
-  let user = users.find((item) => item.name.toLowerCase() === userName.toLowerCase());
-  if (!user) {
-    user = { id: Date.now().toString(), name: userName.trim() };
-    users.push(user);
+  if (!validatePin(pin)) {
+    return res.status(400).json({ error: 'El PIN debe tener 4 numeros.' });
+  }
+
+  let user;
+  try {
+    user = await getOrCreateUser(userName, pin);
+  } catch (error) {
+    return res.status(error.statusCode || 500).json({ error: error.message || 'No se pudo validar el usuario.' });
   }
 
   const originalBet = bets.find((item) => item.id === challengeId && item.type === 'original');
@@ -538,6 +671,7 @@ app.post('/api/counter-bets', async (req, res) => {
   };
 
   notifications.unshift(notification);
+  await persistState(['users', 'bets', 'notifications']);
   broadcastNotification(notification);
 
   res.json({ bet: counterBet, notification });
@@ -567,7 +701,7 @@ app.post('/api/admin/results', (req, res) => {
   });
 });
 
-app.post('/api/results', (req, res) => {
+app.post('/api/results', async (req, res) => {
   if (!isAdminCodeValid(req.body.adminCode)) {
     return res.status(401).json({ error: 'Solo el administrador puede guardar ganadores.' });
   }
@@ -584,6 +718,7 @@ app.post('/api/results', (req, res) => {
   if (!savedWinner) {
     return res.status(400).json({ error: 'El ganador debe ser una de las dos personas de la apuesta.' });
   }
+  await persistState(['winnerHistory']);
 
   broadcastNotification({
     id: `winner-${Date.now()}`,
@@ -622,6 +757,14 @@ function broadcastNotification(notification) {
 
 setInterval(ensureDailyReset, 60 * 1000);
 
-app.listen(PORT, () => {
-  console.log(`Servidor listo en http://localhost:${PORT}`);
-});
+initDatabase()
+  .then(() => {
+    app.listen(PORT, () => {
+      console.log(`Servidor listo en http://localhost:${PORT}`);
+      console.log(db ? 'Base de datos conectada.' : 'Sin DATABASE_URL: usando memoria temporal.');
+    });
+  })
+  .catch((error) => {
+    console.error('No se pudo iniciar la base de datos:', error);
+    process.exit(1);
+  });

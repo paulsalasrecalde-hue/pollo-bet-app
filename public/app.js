@@ -14,6 +14,7 @@ const userStatus = document.getElementById('user-status');
 const userInfo = document.getElementById('user-info');
 const userMessage = document.getElementById('user-message');
 const userInput = document.getElementById('user-input');
+const pinInput = document.getElementById('pin-input');
 const setUserBtn = document.getElementById('set-user-btn');
 const userSetup = document.getElementById('user-setup');
 const userDisplay = document.getElementById('user-display');
@@ -23,6 +24,7 @@ const winnersList = document.getElementById('winners-list');
 
 let currentUserName = '';
 let currentChallengeId = null;
+let currentUserPin = '';
 let matchCatalog = []; 
 
 function sameName(firstName, secondName) {
@@ -139,6 +141,7 @@ function setBetFormEnabled(enabled) {
 
 function lockUserStepAfterBet() {
   userInput.disabled = true;
+  pinInput.disabled = true;
   setUserBtn.disabled = true;
   userMessage.textContent = '¡Tu apuesta quedó registrada! Para que otra persona la acepte, cambia de jugador en el paso 1.';
   setBetFormEnabled(false);
@@ -149,8 +152,11 @@ function unlockUserStepForNewPerson() {
   currentUserName = '';
   currentChallengeId = null;
   userInput.disabled = false;
+  pinInput.disabled = false;
   setUserBtn.disabled = false;
   userInput.value = '';
+  pinInput.value = '';
+  currentUserPin = '';
   userInfo.textContent = '';
   userMessage.textContent = '';
   userSetup.style.display = 'grid';
@@ -531,6 +537,16 @@ function renderNotificationItem(notify) {
   acceptNameInput.value = isOwnBet ? '' : currentUserName;
   acceptNameInput.disabled = Boolean(isOwnBet);
 
+  const acceptPinInput = document.createElement('input');
+  acceptPinInput.type = 'password';
+  acceptPinInput.name = 'acceptorPin';
+  acceptPinInput.placeholder = 'PIN';
+  acceptPinInput.maxLength = 4;
+  acceptPinInput.inputMode = 'numeric';
+  acceptPinInput.required = true;
+  acceptPinInput.value = isOwnBet ? '' : currentUserPin;
+  acceptPinInput.disabled = Boolean(isOwnBet);
+
   const acceptButton = document.createElement('button');
   acceptButton.type = 'submit';
   acceptButton.className = 'counter-button';
@@ -546,6 +562,7 @@ function renderNotificationItem(notify) {
       : `Acepta como contrario a ${notify.teamName} por ${amountText} presas.`);
 
   acceptForm.appendChild(acceptNameInput);
+  acceptForm.appendChild(acceptPinInput);
   acceptForm.appendChild(acceptButton);
 
   acceptForm.addEventListener('submit', async (event) => {
@@ -563,10 +580,17 @@ function renderNotificationItem(notify) {
       return;
     }
 
+    const acceptorPin = acceptPinInput.value.trim();
+    if (!/^\d{4}$/.test(acceptorPin)) {
+      betMessage.textContent = 'El PIN debe tener 4 numeros.';
+      acceptPinInput.focus();
+      return;
+    }
+
     acceptButton.disabled = true;
     acceptButton.textContent = 'Aceptando...';
     try {
-      await acceptBetWithName(notify, acceptorName);
+      await acceptBetWithName(notify, acceptorName, acceptorPin);
     } finally {
       acceptButton.disabled = false;
       acceptButton.textContent = 'Aceptar apuesta';
@@ -578,11 +602,11 @@ function renderNotificationItem(notify) {
   return item;
 }
 
-async function acceptBetWithName(notification, acceptorName) {
+async function acceptBetWithName(notification, acceptorName, acceptorPin) {
   const registerRes = await fetch('/api/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: acceptorName })
+    body: JSON.stringify({ name: acceptorName, pin: acceptorPin })
   });
   const registerData = await registerRes.json();
   if (!registerRes.ok || registerData.error) {
@@ -596,6 +620,7 @@ async function acceptBetWithName(notification, acceptorName) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       userName: registerData.user.name,
+      pin: acceptorPin,
       challengeId
     })
   });
@@ -607,6 +632,7 @@ async function acceptBetWithName(notification, acceptorName) {
   }
 
   currentUserName = registerData.user.name;
+  currentUserPin = acceptorPin;
   userStatus.textContent = currentUserName;
   userSetup.style.display = 'none';
   userDisplay.style.display = 'block';
@@ -626,6 +652,7 @@ async function submitCounterBet(notification) {
   const author = notification.originalUserName || notification.userName;
   const payload = {
     userName: currentUserName,
+    pin: currentUserPin,
     challengeId: notification.originalBetId || notification.betId
   };
 
@@ -779,11 +806,11 @@ function subscribeToNotifications() {
   };
 }
 
-async function registerUser(userName) {
+async function registerUser(userName, pin) {
   const res = await fetch('/api/register', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: userName })
+    body: JSON.stringify({ name: userName, pin })
   });
 
   const data = await res.json();
@@ -793,6 +820,7 @@ async function registerUser(userName) {
   }
 
   currentUserName = data.user.name;
+  currentUserPin = pin;
   userStatus.textContent = currentUserName;
   userMessage.textContent = 'Listo para apostar.';
   userInfo.textContent = '';
@@ -801,6 +829,7 @@ async function registerUser(userName) {
   newBetBtn.style.display = 'none';
   userInput.disabled = false;
   setUserBtn.disabled = false;
+  pinInput.disabled = false;
 
   if (data.blockedByRound) {
     userMessage.textContent = 'Ese nombre ya cerró una ronda. Pulsa HAZ UNA NUEVA APUESTA para reiniciar desde 0.';
@@ -831,6 +860,7 @@ betForm.addEventListener('submit', async (event) => {
   const formData = new FormData(betForm);
   const payload = {
     userName: currentUserName,
+    pin: currentUserPin,
     matchId: formData.get('matchId'),
     teamName: formData.get('teamName'),
     amount: formData.get('amount')
@@ -870,22 +900,32 @@ newBetBtn.addEventListener('click', () => {
   unlockUserStepForNewPerson();
 });
 
-setUserBtn.addEventListener('click', async () => {
+async function confirmUserFromInputs() {
   let name = userInput.value.trim();
   if (!name) {
     name = generateUserName();
   }
-  await registerUser(name);
+
+  const pin = pinInput.value.trim();
+  if (!/^\d{4}$/.test(pin)) {
+    userMessage.textContent = 'Ingresa un PIN de 4 numeros.';
+    pinInput.focus();
+    return;
+  }
+
+  await registerUser(name, pin);
+}
+
+setUserBtn.addEventListener('click', async () => {
+  await confirmUserFromInputs();
 });
 
-userInput.addEventListener('keypress', async (e) => {
-  if (e.key === 'Enter') {
-    let name = userInput.value.trim();
-    if (!name) {
-      name = generateUserName();
+[userInput, pinInput].forEach((input) => {
+  input.addEventListener('keypress', async (e) => {
+    if (e.key === 'Enter') {
+      await confirmUserFromInputs();
     }
-    await registerUser(name);
-  }
+  });
 });
 
 initializeUserSetup();
