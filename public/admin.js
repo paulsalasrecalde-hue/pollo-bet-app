@@ -10,8 +10,10 @@ const adminUserForm = document.getElementById('admin-user-form');
 const adminUserName = document.getElementById('admin-user-name');
 const adminUserPin = document.getElementById('admin-user-pin');
 const adminUserMessage = document.getElementById('admin-user-message');
+const pinRequestsList = document.getElementById('pin-requests-list');
 
 let adminCode = '';
+let pinRequestTimer = null;
 
 function renderWinnerOptions(winners) {
   const selectedBet = winnerBetSelect.value;
@@ -74,6 +76,89 @@ async function loadPublicWinners() {
   renderWinners(Array.isArray(data.winners) ? data.winners : []);
 }
 
+function renderPinRequests(pinRequests) {
+  const pendingRequests = pinRequests.filter((request) => request.status === 'pending');
+  pinRequestsList.innerHTML = '';
+
+  if (!pendingRequests.length) {
+    const empty = document.createElement('li');
+    empty.textContent = 'No hay solicitudes pendientes.';
+    pinRequestsList.appendChild(empty);
+    return;
+  }
+
+  pendingRequests.forEach((request) => {
+    const item = document.createElement('li');
+    item.className = 'notification-item';
+
+    const title = document.createElement('div');
+    title.className = 'notification-title';
+    title.textContent = request.name;
+
+    const details = document.createElement('div');
+    details.className = 'notification-details';
+    details.textContent = `Solicitado: ${new Date(request.createdAt).toLocaleString('es-ES')}`;
+
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'counter-button';
+    button.textContent = 'Autorizar PIN';
+    button.addEventListener('click', async () => {
+      button.disabled = true;
+      button.textContent = 'Autorizando...';
+      try {
+        await approvePinRequest(request.id);
+      } finally {
+        button.disabled = false;
+        button.textContent = 'Autorizar PIN';
+      }
+    });
+
+    item.appendChild(title);
+    item.appendChild(details);
+    item.appendChild(button);
+    pinRequestsList.appendChild(item);
+  });
+}
+
+async function loadPinRequests() {
+  if (!adminCode) {
+    renderPinRequests([]);
+    return;
+  }
+
+  const res = await fetch('/api/admin/pin-requests', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ adminCode })
+  });
+  const data = await res.json();
+
+  if (!res.ok || data.error) {
+    adminUserMessage.textContent = data.error || 'No se pudieron cargar las solicitudes.';
+    return;
+  }
+
+  renderPinRequests(Array.isArray(data.pinRequests) ? data.pinRequests : []);
+}
+
+async function approvePinRequest(requestId) {
+  const res = await fetch('/api/admin/pin-requests/approve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ adminCode, requestId })
+  });
+  const data = await res.json();
+
+  if (!res.ok || data.error) {
+    adminUserMessage.textContent = data.error || 'No se pudo autorizar el PIN.';
+    return;
+  }
+
+  adminUserMessage.textContent = `Jugador autorizado: ${data.user.name}`;
+  renderPinRequests(Array.isArray(data.pinRequests) ? data.pinRequests : []);
+}
+
 async function loadAdminResults() {
   if (!adminCode) {
     await loadPublicWinners();
@@ -125,7 +210,13 @@ adminLoginBtn.addEventListener('click', async () => {
   adminUserForm.style.display = 'grid';
   resultForm.style.display = 'grid';
   resultMessage.textContent = 'Modo administrador activo.';
+  await loadPinRequests();
   await loadAdminResults();
+
+  if (pinRequestTimer) {
+    clearInterval(pinRequestTimer);
+  }
+  pinRequestTimer = setInterval(loadPinRequests, 15000);
 });
 
 adminUserForm.addEventListener('submit', async (event) => {
@@ -159,6 +250,9 @@ adminUserForm.addEventListener('submit', async (event) => {
 
   adminUserMessage.textContent = `Jugador autorizado: ${data.user.name}`;
   adminUserForm.reset();
+  if (Array.isArray(data.pinRequests)) {
+    renderPinRequests(data.pinRequests);
+  }
 });
 
 resultForm.addEventListener('submit', async (event) => {

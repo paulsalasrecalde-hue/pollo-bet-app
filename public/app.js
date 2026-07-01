@@ -21,6 +21,11 @@ const userDisplay = document.getElementById('user-display');
 const newBetBtn = document.getElementById('new-bet-btn');
 const betMessage = document.getElementById('bet-message');
 const winnersList = document.getElementById('winners-list');
+const requestPinBtn = document.getElementById('request-pin-btn');
+const pinRequestForm = document.getElementById('pin-request-form');
+const pinRequestName = document.getElementById('pin-request-name');
+const pinRequestPin = document.getElementById('pin-request-pin');
+const sendPinRequestBtn = document.getElementById('send-pin-request-btn');
 
 let currentUserName = '';
 let currentChallengeId = null;
@@ -920,6 +925,59 @@ async function confirmUserFromInputs() {
 
 setUserBtn.addEventListener('click', async () => {
   await confirmUserFromInputs();
+});
+
+requestPinBtn.addEventListener('click', () => {
+  const isHidden = pinRequestForm.style.display === 'none';
+  pinRequestForm.style.display = isHidden ? 'grid' : 'none';
+  if (isHidden) {
+    pinRequestName.value = userInput.value.trim();
+    pinRequestPin.value = pinInput.value.trim();
+    pinRequestName.focus();
+  }
+});
+
+pinRequestForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const name = pinRequestName.value.trim();
+  const pin = pinRequestPin.value.trim();
+
+  if (!name) {
+    userMessage.textContent = 'Escribe tu nombre real para solicitar PIN.';
+    pinRequestName.focus();
+    return;
+  }
+
+  if (!/^\d{4}$/.test(pin)) {
+    userMessage.textContent = 'El PIN debe tener 4 numeros.';
+    pinRequestPin.focus();
+    return;
+  }
+
+  sendPinRequestBtn.disabled = true;
+  sendPinRequestBtn.textContent = 'Enviando...';
+  try {
+    const res = await fetch('/api/pin-requests', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name, pin })
+    });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      userMessage.textContent = data.error || 'No se pudo enviar la solicitud.';
+      return;
+    }
+
+    userInput.value = name;
+    pinInput.value = pin;
+    userMessage.textContent = data.message || 'Solicitud enviada. Espera aprobacion del administrador.';
+    pinRequestForm.style.display = 'none';
+    pinRequestForm.reset();
+  } finally {
+    sendPinRequestBtn.disabled = false;
+    sendPinRequestBtn.textContent = 'Enviar solicitud';
+  }
 });
 
 [userInput, pinInput].forEach((input) => {

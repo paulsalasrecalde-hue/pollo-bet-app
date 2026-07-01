@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=20260701-admin-users" />
+    <link rel="stylesheet" href="./styles.css?v=20260701-pin-requests" />
   </head>
   <body>
     <main class="app-shell">
@@ -33,7 +33,15 @@
         <div id="user-setup" class="user-setup">
           <input id="user-input" type="text" placeholder="Escribe tu nombre real (obligatorio)" maxlength="20" />
           <input id="pin-input" type="password" placeholder="PIN de 4 numeros" maxlength="4" inputmode="numeric" autocomplete="off" />
-          <p class="hint">Ingresa tu PIN de 4 digitos</p>
+          <div class="pin-help-row">
+            <p class="hint">Ingresa tu PIN de 4 digitos</p>
+            <button id="request-pin-btn" type="button">Registrar PIN</button>
+          </div>
+          <form id="pin-request-form" class="pin-request-form" style="display:none;">
+            <input id="pin-request-name" type="text" placeholder="Nombre real para registrar" maxlength="20" />
+            <input id="pin-request-pin" type="password" placeholder="PIN de 4 numeros" maxlength="4" inputmode="numeric" autocomplete="off" />
+            <button id="send-pin-request-btn" type="submit">Enviar solicitud</button>
+          </form>
           <button id="set-user-btn" type="button">Confirmar</button>
           <p id="user-info"></p>
         </div>
@@ -83,6 +91,6 @@
 
     </main>
 
-    <script src="/app.js?v=20260701-admin-users"></script>
+    <script src="/app.js?v=20260701-pin-requests"></script>
   </body>
 </html>

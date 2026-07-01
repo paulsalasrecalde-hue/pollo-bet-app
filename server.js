@@ -21,6 +21,7 @@ let users = [];
 let bets = [];
 let notifications = [];
 let winnerHistory = [];
+let pinRequests = [];
 let notificationClients = new Set();
 let activeResetDate = getLocalDateKey();
 
@@ -55,9 +56,10 @@ async function initDatabase() {
   bets = Array.isArray(state.bets) ? state.bets : bets;
   notifications = Array.isArray(state.notifications) ? state.notifications : notifications;
   winnerHistory = Array.isArray(state.winnerHistory) ? state.winnerHistory : winnerHistory;
+  pinRequests = Array.isArray(state.pinRequests) ? state.pinRequests : pinRequests;
   activeResetDate = state.activeResetDate || activeResetDate;
 
-  await persistState(['users', 'bets', 'notifications', 'winnerHistory', 'activeResetDate']);
+  await persistState(['users', 'bets', 'notifications', 'winnerHistory', 'pinRequests', 'activeResetDate']);
 }
 
 async function saveState(key, value) {
@@ -83,6 +85,7 @@ async function persistState(keys) {
     bets,
     notifications,
     winnerHistory,
+    pinRequests,
     activeResetDate
   };
 
@@ -405,6 +408,77 @@ async function createAuthorizedUser(name, pin) {
   return user;
 }
 
+function publicPinRequest(request) {
+  return {
+    id: request.id,
+    name: request.name,
+    status: request.status,
+    createdAt: request.createdAt,
+    approvedAt: request.approvedAt || null
+  };
+}
+
+async function requestPinRegistration(name, pin) {
+  const normalizedName = String(name || '').trim();
+
+  if (!normalizedName) {
+    const error = new Error('El nombre es obligatorio.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!validatePin(pin)) {
+    const error = new Error('El PIN debe tener 4 numeros.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const existingUser = users.find((user) => user.name.toLowerCase() === normalizedName.toLowerCase());
+  if (existingUser?.authorized !== false && existingUser?.pinHash) {
+    const error = new Error('Ese nombre ya tiene PIN registrado.');
+    error.statusCode = 409;
+    throw error;
+  }
+
+  const existingRequest = pinRequests.find((request) =>
+    request.status === 'pending' && request.name.toLowerCase() === normalizedName.toLowerCase()
+  );
+
+  if (existingRequest) {
+    existingRequest.pin = String(pin);
+    existingRequest.createdAt = new Date().toISOString();
+    await persistState(['pinRequests']);
+    return existingRequest;
+  }
+
+  const request = {
+    id: Date.now().toString(),
+    name: normalizedName,
+    pin: String(pin),
+    status: 'pending',
+    createdAt: new Date().toISOString()
+  };
+  pinRequests.unshift(request);
+  await persistState(['pinRequests']);
+  return request;
+}
+
+async function approvePinRequest(requestId) {
+  const request = pinRequests.find((item) => item.id === String(requestId || '') && item.status === 'pending');
+  if (!request) {
+    const error = new Error('Solicitud no encontrada.');
+    error.statusCode = 404;
+    throw error;
+  }
+
+  const user = await createAuthorizedUser(request.name, request.pin);
+  request.status = 'approved';
+  request.approvedAt = new Date().toISOString();
+  delete request.pin;
+  await persistState(['users', 'pinRequests']);
+  return { request, user };
+}
+
 async function getMatchAvailability(matchId) {
   const date = getEspnDate();
 
@@ -483,6 +557,18 @@ app.post('/api/register', async (req, res) => {
     });
   } catch (error) {
     res.status(error.statusCode || 500).json({ error: error.message || 'No se pudo registrar el usuario.' });
+  }
+});
+
+app.post('/api/pin-requests', async (req, res) => {
+  try {
+    const request = await requestPinRegistration(req.body.name, req.body.pin);
+    res.json({
+      request: publicPinRequest(request),
+      message: 'Solicitud enviada. Espera aprobacion del administrador.'
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ error: error.message || 'No se pudo enviar la solicitud.' });
   }
 });
 
@@ -725,10 +811,38 @@ app.post('/api/admin/users', async (req, res) => {
     const user = await createAuthorizedUser(req.body.name, req.body.pin);
     res.json({
       user: publicUser(user),
-      users: users.map(publicUser)
+      users: users.map(publicUser),
+      pinRequests: pinRequests.map(publicPinRequest)
     });
   } catch (error) {
     res.status(error.statusCode || 500).json({ error: error.message || 'No se pudo crear el usuario.' });
+  }
+});
+
+app.post('/api/admin/pin-requests', (req, res) => {
+  if (!isAdminCodeValid(req.body.adminCode)) {
+    return res.status(401).json({ error: 'Clave de administrador incorrecta.' });
+  }
+
+  res.json({
+    pinRequests: pinRequests.map(publicPinRequest)
+  });
+});
+
+app.post('/api/admin/pin-requests/approve', async (req, res) => {
+  if (!isAdminCodeValid(req.body.adminCode)) {
+    return res.status(401).json({ error: 'Clave de administrador incorrecta.' });
+  }
+
+  try {
+    const { request, user } = await approvePinRequest(req.body.requestId);
+    res.json({
+      request: publicPinRequest(request),
+      user: publicUser(user),
+      pinRequests: pinRequests.map(publicPinRequest)
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ error: error.message || 'No se pudo aprobar la solicitud.' });
   }
 });
 

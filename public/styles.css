@@ -115,7 +115,8 @@ button:hover {
 #active-bets-list,
 #proposals-list,
 #participants-list,
-#winners-list {
+#winners-list,
+#pin-requests-list {
   margin: 0;
   padding-left: 18px;
   display: grid;
@@ -132,6 +133,7 @@ button:hover {
 #proposals-list li,
 #participants-list li,
 #winners-list li,
+#pin-requests-list li,
 .match-item {
   background: linear-gradient(180deg, rgba(14, 24, 68, 0.92), rgba(8, 14, 44, 0.9));
   border: 1px solid rgba(57, 255, 136, 0.28);
@@ -219,6 +221,35 @@ button:hover {
 .user-setup {
   display: grid;
   gap: 12px;
+}
+
+.pin-help-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.pin-help-row .hint {
+  margin: 0;
+  flex: 1;
+}
+
+#request-pin-btn {
+  width: auto;
+  min-height: 38px;
+  padding: 8px 12px;
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-blue));
+  border-color: rgba(0, 245, 255, 0.8);
+  color: #031226;
+}
+
+.pin-request-form {
+  display: grid;
+  gap: 10px;
+  padding: 10px;
+  border: 1px dashed rgba(0, 245, 255, 0.35);
+  border-radius: 10px;
 }
 
 #user-input {
@@ -322,7 +353,8 @@ button:hover {
   #active-bets-list,
   #proposals-list,
   #participants-list,
-  #winners-list {
+  #winners-list,
+  #pin-requests-list {
     padding-left: 0;
     list-style: none;
   }
@@ -366,6 +398,7 @@ button:hover {
   #proposals-list li,
   #participants-list li,
   #winners-list li,
+  #pin-requests-list li,
   .match-item {
     border-radius: 8px;
     padding: 9px;
@@ -373,6 +406,15 @@ button:hover {
 
   .top-grid {
     gap: 12px;
+  }
+
+  .pin-help-row {
+    display: grid;
+    gap: 8px;
+  }
+
+  #request-pin-btn {
+    width: 100%;
   }
 }
 
