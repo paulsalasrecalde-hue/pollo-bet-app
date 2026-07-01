@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=20260701-pin-db" />
+    <link rel="stylesheet" href="./styles.css?v=20260701-pin-help-text" />
   </head>
   <body>
     <main class="app-shell">
@@ -31,8 +31,9 @@
       <section class="card">
         <h2>1. Tu nombre</h2>
         <div id="user-setup" class="user-setup">
-          <input id="user-input" type="text" placeholder="Escribe tu nombre (opcional)" maxlength="20" />
+          <input id="user-input" type="text" placeholder="Escribe tu nombre real (obligatorio)" maxlength="20" />
           <input id="pin-input" type="password" placeholder="PIN de 4 numeros" maxlength="4" inputmode="numeric" autocomplete="off" />
+          <p class="hint">Crea un PIN de 4 n�meros para generar tu apuesta (no la olvides si no no podr�s apostar).</p>
           <button id="set-user-btn" type="button">Confirmar</button>
           <p id="user-info"></p>
         </div>
@@ -82,6 +83,6 @@
 
     </main>
 
-    <script src="/app.js?v=20260701-pin-db"></script>
+    <script src="/app.js?v=20260701-pin-help-text"></script>
   </body>
 </html>
