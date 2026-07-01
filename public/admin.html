@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Administrador | POLLAZO BEAT</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="./styles.css?v=20260701-public-winners" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="hero">
+        <h1>ADMIN POLLAZO BEAT</h1>
+        <p>Panel privado para registrar ganadores de apuestas cerradas</p>
+      </section>
+
+      <section class="card">
+        <h2>Registrar ganador</h2>
+        <div id="admin-login" class="admin-login">
+          <input id="admin-code-input" type="password" placeholder="Clave de administrador" autocomplete="off" />
+          <button id="admin-login-btn" type="button">Entrar</button>
+        </div>
+        <form id="result-form" style="display:none;">
+          <label>
+            Apuesta cerrada
+            <select id="winner-bet-select" name="winnerKey" required>
+              <option value="">Selecciona una apuesta cerrada...</option>
+            </select>
+          </label>
+          <label>
+            Ganador
+            <select id="winner-name-select" name="winnerName" required>
+              <option value="">Selecciona el ganador...</option>
+            </select>
+          </label>
+          <button id="save-result-btn" type="submit">Guardar ganador</button>
+        </form>
+        <p id="result-message"></p>
+      </section>
+
+      <section class="card">
+        <h2>Ganadores registrados</h2>
+        <ul id="winners-list"></ul>
+      </section>
+    </main>
+
+    <script src="/admin.js?v=20260701-public-winners"></script>
+  </body>
+</html>
