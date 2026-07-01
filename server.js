@@ -856,6 +856,26 @@ app.post('/api/admin/results', (req, res) => {
   });
 });
 
+app.post('/api/admin/reset-bets', async (req, res) => {
+  if (!isAdminCodeValid(req.body.adminCode)) {
+    return res.status(401).json({ error: 'Clave de administrador incorrecta.' });
+  }
+
+  bets = [];
+  notifications = [];
+  activeResetDate = getLocalDateKey();
+  await persistState(['bets', 'notifications', 'activeResetDate']);
+
+  broadcastNotification({
+    id: `admin-reset-${Date.now()}`,
+    type: 'admin-reset',
+    message: 'El administrador borro todas las apuestas actuales.',
+    createdAt: new Date().toISOString()
+  });
+
+  res.json({ ok: true, message: 'Apuestas borradas.' });
+});
+
 app.post('/api/results', async (req, res) => {
   if (!isAdminCodeValid(req.body.adminCode)) {
     return res.status(401).json({ error: 'Solo el administrador puede guardar ganadores.' });

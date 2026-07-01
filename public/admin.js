@@ -11,6 +11,8 @@ const adminUserName = document.getElementById('admin-user-name');
 const adminUserPin = document.getElementById('admin-user-pin');
 const adminUserMessage = document.getElementById('admin-user-message');
 const pinRequestsList = document.getElementById('pin-requests-list');
+const resetBetsBtn = document.getElementById('reset-bets-btn');
+const resetBetsMessage = document.getElementById('reset-bets-message');
 
 let adminCode = '';
 let pinRequestTimer = null;
@@ -208,6 +210,7 @@ adminLoginBtn.addEventListener('click', async () => {
   adminCode = typedCode;
   adminLogin.style.display = 'none';
   adminUserForm.style.display = 'grid';
+  resetBetsBtn.style.display = 'inline-block';
   resultForm.style.display = 'grid';
   resultMessage.textContent = 'Modo administrador activo.';
   await loadPinRequests();
@@ -252,6 +255,40 @@ adminUserForm.addEventListener('submit', async (event) => {
   adminUserForm.reset();
   if (Array.isArray(data.pinRequests)) {
     renderPinRequests(data.pinRequests);
+  }
+});
+
+resetBetsBtn.addEventListener('click', async () => {
+  if (!adminCode) {
+    resetBetsMessage.textContent = 'Primero ingresa como administrador.';
+    return;
+  }
+
+  const confirmed = window.confirm('Esto borrara todas las apuestas actuales. Los usuarios y ganadores guardados se mantienen.');
+  if (!confirmed) {
+    return;
+  }
+
+  resetBetsBtn.disabled = true;
+  resetBetsBtn.textContent = 'Borrando...';
+  try {
+    const res = await fetch('/api/admin/reset-bets', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminCode })
+    });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      resetBetsMessage.textContent = data.error || 'No se pudieron borrar las apuestas.';
+      return;
+    }
+
+    resetBetsMessage.textContent = data.message || 'Apuestas borradas.';
+    await loadAdminResults();
+  } finally {
+    resetBetsBtn.disabled = false;
+    resetBetsBtn.textContent = 'Borrar todas las apuestas';
   }
 });
 
