@@ -1,0 +1,268 @@
+:root {
+  color-scheme: dark;
+  font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  --bg-1: #050816;
+  --bg-2: #0f183f;
+  --card: rgba(10, 16, 46, 0.84);
+  --card-border: rgba(0, 245, 255, 0.35);
+  --text: #f7fbff;
+  --neon-cyan: #00f5ff;
+  --neon-blue: #1f6bff;
+  --neon-green: #39ff88;
+  --neon-yellow: #ffe44d;
+  --neon-pink: #ff3ea5;
+  --muted: #b8c7ff;
+  background: var(--bg-1);
+  color: var(--text);
+}
+
+body {
+  margin: 0;
+  background:
+    radial-gradient(circle at 15% 15%, rgba(31, 107, 255, 0.35), transparent 35%),
+    radial-gradient(circle at 85% 20%, rgba(255, 62, 165, 0.28), transparent 40%),
+    radial-gradient(circle at 50% 85%, rgba(57, 255, 136, 0.2), transparent 45%),
+    linear-gradient(130deg, var(--bg-1), var(--bg-2));
+  min-height: 100vh;
+}
+
+.app-shell {
+  max-width: 900px;
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  gap: 18px;
+}
+
+.top-grid {
+  display: grid;
+  grid-template-columns: 1fr 1.35fr;
+  gap: 18px;
+}
+
+.hero,
+.card {
+  background: var(--card);
+  border: 1px solid var(--card-border);
+  border-radius: 16px;
+  padding: 20px;
+  box-shadow:
+    0 10px 30px rgba(0, 0, 0, 0.35),
+    0 0 0 1px rgba(31, 107, 255, 0.15),
+    0 0 24px rgba(0, 245, 255, 0.1);
+}
+
+.hero h1 {
+  font-family: "Luckiest Guy", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-size: clamp(2.4rem, 6vw, 4rem);
+  line-height: 1;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--neon-cyan);
+  text-shadow:
+    -2px -2px 0 #00122c,
+    2px -2px 0 #00122c,
+    -2px 2px 0 #00122c,
+    2px 2px 0 #00122c,
+    0 0 10px rgba(0, 245, 255, 0.65),
+    0 0 26px rgba(31, 107, 255, 0.5);
+}
+
+.hero p {
+  color: var(--muted);
+}
+
+h1,
+h2 {
+  margin-top: 0;
+}
+
+form {
+  display: grid;
+  gap: 12px;
+}
+
+label {
+  display: grid;
+  gap: 6px;
+  font-weight: 600;
+}
+
+input,
+select,
+button {
+  border-radius: 10px;
+  border: 1px solid rgba(0, 245, 255, 0.45);
+  background: rgba(6, 12, 38, 0.8);
+  color: var(--text);
+  padding: 10px 12px;
+  font-size: 1rem;
+}
+
+button {
+  background: linear-gradient(135deg, var(--neon-yellow), #ff9f1c);
+  color: #06122e;
+  font-weight: 700;
+  cursor: pointer;
+  border: 1px solid rgba(255, 228, 77, 0.85);
+  box-shadow: 0 0 14px rgba(255, 228, 77, 0.4);
+}
+
+button:hover {
+  filter: brightness(1.08);
+}
+
+#active-bets-list,
+#proposals-list,
+#participants-list {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 8px;
+}
+
+.notifications-top {
+  min-height: 520px;
+  max-height: none;
+  overflow: visible;
+}
+
+#active-bets-list li,
+#proposals-list li,
+#participants-list li,
+.match-item {
+  background: linear-gradient(180deg, rgba(14, 24, 68, 0.92), rgba(8, 14, 44, 0.9));
+  border: 1px solid rgba(57, 255, 136, 0.28);
+  border-radius: 10px;
+  padding: 10px;
+}
+
+.notification-item {
+  display: grid;
+  gap: 8px;
+}
+
+.notification-title {
+  font-weight: 700;
+  color: var(--neon-yellow);
+}
+
+.notification-details {
+  color: #e6f0ff;
+  line-height: 1.5;
+}
+
+.counter-button {
+  justify-self: start;
+  margin-top: 8px;
+  background: linear-gradient(135deg, var(--neon-green), #00d39b);
+  color: #041b21;
+  border: none;
+  padding: 8px 12px;
+  border-radius: 10px;
+  cursor: pointer;
+  box-shadow: 0 0 12px rgba(57, 255, 136, 0.45);
+}
+
+.counter-button:hover {
+  filter: brightness(1.05);
+}
+
+.notification-status {
+  color: var(--neon-pink);
+  font-size: 0.95rem;
+}
+
+.inline-counter-form {
+  display: grid;
+  grid-template-columns: 1fr 120px auto;
+  gap: 8px;
+  align-items: center;
+}
+
+.inline-counter-form input {
+  padding: 8px 10px;
+}
+
+.match-list {
+  display: grid;
+  gap: 10px;
+}
+
+.match-item strong {
+  display: block;
+  margin-bottom: 4px;
+}
+
+.share-box {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.share-box input {
+  flex: 1;
+}
+
+.user-setup {
+  display: grid;
+  gap: 12px;
+}
+
+#user-input {
+  padding: 12px;
+  border: 1px solid rgba(0, 245, 255, 0.45);
+  border-radius: 10px;
+  background: rgba(8, 14, 44, 0.9);
+  color: var(--text);
+  font-size: 1rem;
+}
+
+#set-user-btn {
+  background: linear-gradient(135deg, var(--neon-pink), #8a2be2);
+  padding: 12px;
+  border: 1px solid rgba(255, 62, 165, 0.7);
+  border-radius: 10px;
+  color: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 0 16px rgba(255, 62, 165, 0.35);
+}
+
+#set-user-btn:hover {
+  filter: brightness(1.05);
+}
+
+#new-bet-btn {
+  margin-top: 10px;
+  background: linear-gradient(135deg, var(--neon-cyan), var(--neon-blue));
+  border: 1px solid rgba(0, 245, 255, 0.8);
+  color: #031226;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+#user-display h3 {
+  margin: 0;
+  color: var(--neon-cyan);
+}
+
+#betting-section.is-locked {
+  opacity: 0.58;
+  border-style: dashed;
+  border-color: rgba(255, 62, 165, 0.5);
+}
+
+#betting-section.is-locked form {
+  pointer-events: none;
+}
+
+@media (max-width: 900px) {
+  .top-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .notifications-top {
+    max-height: none;
+  }
+}

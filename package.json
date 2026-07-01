@@ -1,0 +1,13 @@
+{
+  "name": "pollo-bet-app",
+  "version": "1.0.0",
+  "description": "MVP de app de apuestas para partidos del mundial",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.0"
+  }
+}

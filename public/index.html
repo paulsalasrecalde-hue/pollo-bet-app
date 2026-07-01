@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>POLLAZO BEAT</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="/styles.css?v=20260630-1" />
+  </head>
+  <body>
+    <main class="app-shell">
+      <section class="top-grid">
+        <section class="hero">
+          <h1>POLLAZO BEAT ⚽🍗</h1>
+          <p>Tu sitio de apuestas de presas de pollo del mundial 2026</p>
+        </section>
+
+        <section class="card notifications-top">
+          <h2>Propuestas de Apuestas</h2>
+          <ul id="proposals-list"></ul>
+        </section>
+      </section>
+
+      <section class="card notifications-top">
+        <h2>Apuestas en Vigencia</h2>
+        <ul id="active-bets-list"></ul>
+        </section>
+
+      <section class="card">
+        <h2>1. Tu nombre</h2>
+        <div id="user-setup" class="user-setup">
+          <input id="user-input" type="text" placeholder="Escribe tu nombre (opcional)" maxlength="20" />
+          <button id="set-user-btn" type="button">Confirmar</button>
+          <p id="user-info"></p>
+        </div>
+        <div id="user-display" style="display:none;">
+          <h3><span id="user-status"></span></h3>
+          <p id="user-message"></p>
+          <button id="new-bet-btn" type="button" style="display:none;">CAMBIAR JUGADOR / NUEVA APUESTA</button>
+        </div>
+      </section>
+
+      <section id="betting-section" class="card is-locked">
+        <h2>2. Apostar</h2>
+        <p id="betting-lock-hint" class="hint">Apartado apagado: primero confirma tu usuario en el paso 1.</p>
+        <form id="bet-form">
+          <label>
+            Partido
+            <select id="match-select" name="matchId" required>
+              <option value="">Selecciona un partido oficial...</option>
+            </select>
+          </label>
+          <p id="daily-matches-info" class="hint"></p>
+
+          <label>
+            Equipo al que le apuestas
+            <input id="team-select" name="teamName" type="text" placeholder="Ej: México" required />
+          </label>
+
+          <label>
+            Presas de pollo
+            <input id="amount-input" name="amount" type="number" min="1" required />
+          </label>
+
+          <button id="create-bet-btn" type="submit">Crear apuesta</button>
+        </form>
+        <p id="bet-message"></p>
+      </section>
+
+      <section class="card">
+        <h2>3. Quiénes están apostando</h2>
+        <ul id="participants-list"></ul>
+      </section>
+
+    </main>
+
+    <script src="/app.js?v=20260701-spanish-country-aliases"></script>
+  </body>
+</html>
