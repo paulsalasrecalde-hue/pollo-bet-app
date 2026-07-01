@@ -20,9 +20,8 @@ const userDisplay = document.getElementById('user-display');
 const newBetBtn = document.getElementById('new-bet-btn');
 const betMessage = document.getElementById('bet-message');
 const resultForm = document.getElementById('result-form');
-const resultMatchSelect = document.getElementById('result-match-select');
-const homeScoreInput = document.getElementById('home-score-input');
-const awayScoreInput = document.getElementById('away-score-input');
+const winnerBetSelect = document.getElementById('winner-bet-select');
+const winnerNameSelect = document.getElementById('winner-name-select');
 const resultMessage = document.getElementById('result-message');
 const winnersList = document.getElementById('winners-list');
 
@@ -692,24 +691,43 @@ function renderNotifications(notifications) {
 }
 
 
-function renderResultsPanel(data) {
-  const matches = Array.isArray(data.matches) ? data.matches : [];
-  const winners = Array.isArray(data.winners) ? data.winners : [];
-  const selectedValue = resultMatchSelect.value;
+function renderWinnerOptions(winners) {
+  const selectedBet = winnerBetSelect.value;
+  const selectedWinner = winnerNameSelect.value;
+  const pendingWinners = winners.filter((winner) => winner.status !== 'winner');
 
-  resultMatchSelect.innerHTML = '<option value="">Selecciona una apuesta cerrada...</option>';
-  matches.forEach((matchId) => {
+  winnerBetSelect.innerHTML = '<option value="">Selecciona una apuesta cerrada...</option>';
+  pendingWinners.forEach((winner) => {
     const option = document.createElement('option');
-    option.value = matchId;
-    option.textContent = matchId;
-    resultMatchSelect.appendChild(option);
+    option.value = winner.key;
+    option.textContent = `${winner.originalUserName} vs ${winner.counterUserName || 'pendiente'} · ${winner.matchId}`;
+    winnerBetSelect.appendChild(option);
   });
-  resultMatchSelect.value = matches.includes(selectedValue) ? selectedValue : '';
+
+  winnerBetSelect.value = pendingWinners.some((winner) => winner.key === selectedBet) ? selectedBet : '';
+  winnerNameSelect.innerHTML = '<option value="">Selecciona el ganador...</option>';
+
+  const currentBet = pendingWinners.find((winner) => winner.key === winnerBetSelect.value);
+  if (currentBet) {
+    [currentBet.originalUserName, currentBet.counterUserName].filter(Boolean).forEach((name) => {
+      const option = document.createElement('option');
+      option.value = name;
+      option.textContent = name;
+      winnerNameSelect.appendChild(option);
+    });
+  }
+
+  winnerNameSelect.value = [...winnerNameSelect.options].some((option) => option.value === selectedWinner) ? selectedWinner : '';
+}
+
+function renderResultsPanel(data) {
+  const winners = Array.isArray(data.winners) ? data.winners : [];
+  renderWinnerOptions(winners);
 
   winnersList.innerHTML = '';
   if (!winners.length) {
     const empty = document.createElement('li');
-    empty.textContent = 'Aun no hay apuestas cerradas para calcular ganadores.';
+    empty.textContent = 'Aun no hay apuestas cerradas para registrar ganadores.';
     winnersList.appendChild(empty);
     return;
   }
@@ -719,11 +737,7 @@ function renderResultsPanel(data) {
     item.className = 'winner-item';
     const statusText = winner.status === 'winner'
       ? `Ganador: ${winner.winnerName}`
-      : winner.status === 'draw'
-        ? 'Empate: no hay ganador directo.'
-        : winner.status === 'no-match'
-          ? 'Resultado guardado, pero no coincide con los equipos apostados.'
-          : 'Pendiente de resultado final.';
+      : 'Pendiente de ganador.';
 
     item.innerHTML = `
       <div class="notification-title">${statusText}</div>
@@ -894,12 +908,15 @@ newBetBtn.addEventListener('click', () => {
   unlockUserStepForNewPerson();
 });
 
+winnerBetSelect.addEventListener('change', async () => {
+  await loadResults();
+});
+
 resultForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const payload = {
-    matchId: resultMatchSelect.value,
-    homeScore: homeScoreInput.value,
-    awayScore: awayScoreInput.value
+    winnerKey: winnerBetSelect.value,
+    winnerName: winnerNameSelect.value
   };
 
   const res = await fetch('/api/results', {
@@ -910,7 +927,7 @@ resultForm.addEventListener('submit', async (event) => {
   const data = await res.json();
 
   if (!res.ok || data.error) {
-    resultMessage.textContent = data.error || 'No se pudo guardar el resultado.';
+    resultMessage.textContent = data.error || 'No se pudo guardar el ganador.';
     return;
   }
 

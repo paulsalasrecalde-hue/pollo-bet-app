@@ -15,7 +15,6 @@ app.use(express.static('public'));
 let users = [];
 let bets = [];
 let notifications = [];
-let matchResults = [];
 let winnerHistory = [];
 let notificationClients = new Set();
 let activeResetDate = getLocalDateKey();
@@ -176,107 +175,74 @@ function getOppositeTeam(matchId, selectedTeam) {
   return `Contrario a ${selectedTeam}`;
 }
 
-function getMatchParts(matchId) {
-  return String(matchId || '').split(/\s+vs\s+/i).map((item) => item.trim()).filter(Boolean);
-}
-
-function getResultKey(matchId) {
-  return normalizeMatchText(matchId);
-}
-
-function getStoredResult(matchId) {
-  const key = getResultKey(matchId);
-  return matchResults.find((result) => result.key === key) || null;
-}
-
-function getWinnerTeam(matchId, homeScore, awayScore) {
-  const parts = getMatchParts(matchId);
-  if (parts.length !== 2) {
-    return null;
-  }
-
-  if (homeScore === awayScore) {
-    return 'Empate';
-  }
-
-  return homeScore > awayScore ? parts[0] : parts[1];
-}
-
 function buildWinnerRows() {
   return bets
     .filter((bet) => bet.type === 'original' && bet.countered)
     .map((originalBet) => {
       const counterBet = bets.find((bet) => bet.type === 'counter' && bet.responseTo === originalBet.id);
-      const result = getStoredResult(originalBet.matchId);
-      const winnerTeam = result ? getWinnerTeam(originalBet.matchId, result.homeScore, result.awayScore) : null;
-      let winnerName = null;
-      let status = 'pending-result';
+      const historyKey = getWinnerHistoryKey({
+        matchId: originalBet.matchId,
+        originalUserName: originalBet.userName,
+        counterUserName: counterBet?.userName || originalBet.counteredBy || '',
+        amount: originalBet.amount
+      });
+      const savedWinner = winnerHistory.find((row) => row.key === historyKey);
 
-      if (result && counterBet) {
-        if (winnerTeam === 'Empate') {
-          status = 'draw';
-        } else if (teamMatches(winnerTeam, originalBet.teamName)) {
-          winnerName = originalBet.userName;
-          status = 'winner';
-        } else if (teamMatches(winnerTeam, counterBet.teamName)) {
-          winnerName = counterBet.userName;
-          status = 'winner';
-        } else {
-          status = 'no-match';
-        }
-      }
-
-      return {
+      return savedWinner || {
+        key: historyKey,
         matchId: originalBet.matchId,
         amount: originalBet.amount,
+        originalBetId: originalBet.id,
         originalUserName: originalBet.userName,
         originalTeamName: originalBet.teamName,
         counterUserName: counterBet?.userName || originalBet.counteredBy || null,
         counterTeamName: counterBet?.teamName || getOppositeTeam(originalBet.matchId, originalBet.teamName),
-        result,
-        winnerTeam,
-        winnerName,
-        status
+        winnerName: null,
+        status: 'pending-winner'
       };
     });
 }
 
 function getWinnerHistoryKey(row) {
   return [
-    getResultKey(row.matchId),
+    normalizeMatchText(row.matchId),
     normalizeMatchText(row.originalUserName),
     normalizeMatchText(row.counterUserName),
     Number(row.amount) || 0
   ].join('|');
 }
 
-function saveWinnerHistory(rows) {
-  const resolvedAt = new Date().toISOString();
+function saveManualWinner(row, winnerName) {
+  const normalizedWinner = String(winnerName || '').trim();
+  const allowedNames = [row.originalUserName, row.counterUserName].filter(Boolean);
 
-  rows
-    .filter((row) => row.status !== 'pending-result')
-    .forEach((row) => {
-      const historyRow = {
-        ...row,
-        key: getWinnerHistoryKey(row),
-        result: null,
-        resolvedAt
-      };
-      const index = winnerHistory.findIndex((item) => item.key === historyRow.key);
+  if (!allowedNames.some((name) => name.toLowerCase() === normalizedWinner.toLowerCase())) {
+    return null;
+  }
 
-      if (index >= 0) {
-        winnerHistory[index] = historyRow;
-      } else {
-        winnerHistory.unshift(historyRow);
-      }
-    });
+  const historyRow = {
+    ...row,
+    key: getWinnerHistoryKey(row),
+    winnerName: allowedNames.find((name) => name.toLowerCase() === normalizedWinner.toLowerCase()),
+    status: 'winner',
+    resolvedAt: new Date().toISOString()
+  };
+  const index = winnerHistory.findIndex((item) => item.key === historyRow.key);
+
+  if (index >= 0) {
+    winnerHistory[index] = historyRow;
+  } else {
+    winnerHistory.unshift(historyRow);
+  }
+
+  return historyRow;
 }
 
 function getWinnerRowsForResponse() {
   const activeRows = buildWinnerRows();
   const historyKeys = new Set(winnerHistory.map((row) => row.key));
-  const unresolvedActiveRows = activeRows.filter((row) => !historyKeys.has(getWinnerHistoryKey(row)));
-  return [...winnerHistory, ...unresolvedActiveRows];
+  const pendingRows = activeRows.filter((row) => !historyKeys.has(row.key));
+  return [...winnerHistory, ...pendingRows];
 }
 
 async function getMatchAvailability(matchId) {
@@ -573,54 +539,33 @@ app.post('/api/counter-bets', async (req, res) => {
 });
 
 app.get('/api/results', (_req, res) => {
-  const matchIds = [...new Set(bets.filter((bet) => bet.type === 'original' && bet.countered).map((bet) => bet.matchId))];
   res.json({
-    results: matchResults,
-    matches: matchIds,
     winners: getWinnerRowsForResponse()
   });
 });
 
 app.post('/api/results', (req, res) => {
-  const matchId = String(req.body.matchId || '').trim();
-  const homeScore = Number(req.body.homeScore);
-  const awayScore = Number(req.body.awayScore);
-  const parts = getMatchParts(matchId);
+  const winnerKey = String(req.body.winnerKey || '').trim();
+  const winnerName = String(req.body.winnerName || '').trim();
+  const row = buildWinnerRows().find((item) => item.key === winnerKey);
 
-  if (parts.length !== 2 || !Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0) {
-    return res.status(400).json({ error: 'Ingresa partido y marcador final validos.' });
+  if (!row || !winnerName) {
+    return res.status(400).json({ error: 'Selecciona una apuesta y el ganador.' });
   }
 
-  const key = getResultKey(matchId);
-  const savedResult = {
-    key,
-    matchId,
-    homeTeam: parts[0],
-    awayTeam: parts[1],
-    homeScore,
-    awayScore,
-    winnerTeam: getWinnerTeam(matchId, homeScore, awayScore),
-    savedAt: new Date().toISOString()
-  };
-  const index = matchResults.findIndex((result) => result.key === key);
-
-  if (index >= 0) {
-    matchResults[index] = savedResult;
-  } else {
-    matchResults.unshift(savedResult);
+  const savedWinner = saveManualWinner(row, winnerName);
+  if (!savedWinner) {
+    return res.status(400).json({ error: 'El ganador debe ser una de las dos personas de la apuesta.' });
   }
-
-  const resolvedRows = buildWinnerRows().filter((row) => getResultKey(row.matchId) === key);
-  saveWinnerHistory(resolvedRows);
 
   broadcastNotification({
-    id: `result-${Date.now()}`,
-    type: 'result',
-    message: `Resultado guardado para ${matchId}.`,
-    createdAt: savedResult.savedAt
+    id: `winner-${Date.now()}`,
+    type: 'winner',
+    message: `Ganador guardado: ${savedWinner.winnerName}.`,
+    createdAt: savedWinner.resolvedAt
   });
 
-  res.json({ result: savedResult, winners: getWinnerRowsForResponse() });
+  res.json({ winner: savedWinner, winners: getWinnerRowsForResponse() });
 });
 
 app.get('/api/notifications', (_req, res) => {

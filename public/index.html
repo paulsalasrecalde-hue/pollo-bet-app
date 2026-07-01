@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=20260701-winner-history" />
+    <link rel="stylesheet" href="./styles.css?v=20260701-manual-winner" />
   </head>
   <body>
     <main class="app-shell">
@@ -73,22 +73,18 @@
         <h2>3. Ganadores de Apuestas</h2>
         <form id="result-form">
           <label>
-            Partido finalizado
-            <select id="result-match-select" name="matchId" required>
+            Apuesta cerrada
+            <select id="winner-bet-select" name="winnerKey" required>
               <option value="">Selecciona una apuesta cerrada...</option>
             </select>
           </label>
-          <div class="score-grid">
-            <label>
-              Goles equipo 1
-              <input id="home-score-input" name="homeScore" type="number" min="0" required />
-            </label>
-            <label>
-              Goles equipo 2
-              <input id="away-score-input" name="awayScore" type="number" min="0" required />
-            </label>
-          </div>
-          <button id="save-result-btn" type="submit">Guardar resultado</button>
+          <label>
+            Ganador
+            <select id="winner-name-select" name="winnerName" required>
+              <option value="">Selecciona el ganador...</option>
+            </select>
+          </label>
+          <button id="save-result-btn" type="submit">Guardar ganador</button>
         </form>
         <p id="result-message"></p>
         <ul id="winners-list"></ul>
@@ -101,6 +97,6 @@
 
     </main>
 
-    <script src="/app.js?v=20260701-winner-history"></script>
+    <script src="/app.js?v=20260701-manual-winner"></script>
   </body>
 </html>
