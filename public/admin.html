@@ -7,13 +7,29 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=20260701-public-winners" />
+    <link rel="stylesheet" href="./styles.css?v=20260701-admin-users" />
   </head>
   <body>
     <main class="app-shell">
       <section class="hero">
         <h1>ADMIN POLLAZO BEAT</h1>
         <p>Panel privado para registrar ganadores de apuestas cerradas</p>
+      </section>
+
+      <section class="card">
+        <h2>Crear jugador autorizado</h2>
+        <form id="admin-user-form" style="display:none;">
+          <label>
+            Nombre real
+            <input id="admin-user-name" type="text" maxlength="20" placeholder="Nombre del jugador" required />
+          </label>
+          <label>
+            PIN de 4 numeros
+            <input id="admin-user-pin" type="password" maxlength="4" inputmode="numeric" placeholder="PIN" required />
+          </label>
+          <button id="save-user-btn" type="submit">Guardar jugador</button>
+        </form>
+        <p id="admin-user-message"></p>
       </section>
 
       <section class="card">
@@ -46,6 +62,6 @@
       </section>
     </main>
 
-    <script src="/admin.js?v=20260701-public-winners"></script>
+    <script src="/admin.js?v=20260701-admin-users"></script>
   </body>
 </html>

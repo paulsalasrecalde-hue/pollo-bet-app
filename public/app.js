@@ -748,7 +748,7 @@ async function loadResults() {
 
 function prepareCounterBet(notification) {
   if (!currentUserName) {
-    betMessage.textContent = 'Primero regístrate para aceptar un reto.';
+    betMessage.textContent = 'Primero confirma tu usuario autorizado para aceptar un reto.';
     return;
   }
 
@@ -852,7 +852,7 @@ function initializeUserSetup() {
 betForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   if (!currentUserName) {
-    betMessage.textContent = 'Primero regístrate.';
+    betMessage.textContent = 'Primero confirma tu usuario autorizado.';
     createBetBtn.disabled = true;
     return;
   }
@@ -901,9 +901,11 @@ newBetBtn.addEventListener('click', () => {
 });
 
 async function confirmUserFromInputs() {
-  let name = userInput.value.trim();
+  const name = userInput.value.trim();
   if (!name) {
-    name = generateUserName();
+    userMessage.textContent = 'Escribe tu nombre real.';
+    userInput.focus();
+    return;
   }
 
   const pin = pinInput.value.trim();

@@ -51,6 +51,7 @@ async function initDatabase() {
   const state = Object.fromEntries(rows.map((row) => [row.key, row.value]));
 
   users = Array.isArray(state.users) ? state.users : users;
+  users = users.map((user) => ({ ...user, authorized: user.authorized !== false }));
   bets = Array.isArray(state.bets) ? state.bets : bets;
   notifications = Array.isArray(state.notifications) ? state.notifications : notifications;
   winnerHistory = Array.isArray(state.winnerHistory) ? state.winnerHistory : winnerHistory;
@@ -337,7 +338,38 @@ function publicUser(user) {
   };
 }
 
-async function getOrCreateUser(name, pin) {
+function getAuthorizedUser(name, pin) {
+  const normalizedName = String(name || '').trim();
+
+  if (!normalizedName) {
+    const error = new Error('El nombre es obligatorio.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  if (!validatePin(pin)) {
+    const error = new Error('El PIN debe tener 4 numeros.');
+    error.statusCode = 400;
+    throw error;
+  }
+
+  const user = users.find((item) => item.name.toLowerCase() === normalizedName.toLowerCase());
+  if (!user || user.authorized === false || !user.pinHash) {
+    const error = new Error('Ese nombre no esta autorizado. Pide al administrador que cree tu usuario y PIN.');
+    error.statusCode = 403;
+    throw error;
+  }
+
+  if (user.pinHash !== hashPin(pin)) {
+    const error = new Error('PIN incorrecto para ese nombre.');
+    error.statusCode = 401;
+    throw error;
+  }
+
+  return user;
+}
+
+async function createAuthorizedUser(name, pin) {
   const normalizedName = String(name || '').trim();
 
   if (!normalizedName) {
@@ -356,26 +388,19 @@ async function getOrCreateUser(name, pin) {
   let user = users.find((item) => item.name.toLowerCase() === normalizedName.toLowerCase());
 
   if (user) {
-    if (user.pinHash && user.pinHash !== pinHash) {
-      const error = new Error('PIN incorrecto para ese nombre.');
-      error.statusCode = 401;
-      throw error;
-    }
-
-    if (!user.pinHash) {
-      user.pinHash = pinHash;
-      await persistState(['users']);
-    }
-
-    return user;
+    user.name = normalizedName;
+    user.pinHash = pinHash;
+    user.authorized = true;
+  } else {
+    user = {
+      id: Date.now().toString(),
+      name: normalizedName,
+      pinHash,
+      authorized: true
+    };
+    users.push(user);
   }
 
-  user = {
-    id: Date.now().toString(),
-    name: normalizedName,
-    pinHash
-  };
-  users.push(user);
   await persistState(['users']);
   return user;
 }
@@ -448,7 +473,7 @@ app.get('/api/health', (_req, res) => {
 
 app.post('/api/register', async (req, res) => {
   try {
-    const user = await getOrCreateUser(req.body.name, req.body.pin);
+    const user = getAuthorizedUser(req.body.name, req.body.pin);
 
     res.json({
       user: publicUser(user),
@@ -547,7 +572,7 @@ app.post('/api/bets', async (req, res) => {
 
   let user;
   try {
-    user = await getOrCreateUser(userName, pin);
+    user = getAuthorizedUser(userName, pin);
   } catch (error) {
     return res.status(error.statusCode || 500).json({ error: error.message || 'No se pudo validar el usuario.' });
   }
@@ -600,7 +625,7 @@ app.post('/api/counter-bets', async (req, res) => {
 
   let user;
   try {
-    user = await getOrCreateUser(userName, pin);
+    user = getAuthorizedUser(userName, pin);
   } catch (error) {
     return res.status(error.statusCode || 500).json({ error: error.message || 'No se pudo validar el usuario.' });
   }
@@ -689,6 +714,22 @@ app.post('/api/admin/login', (req, res) => {
   }
 
   res.json({ ok: true });
+});
+
+app.post('/api/admin/users', async (req, res) => {
+  if (!isAdminCodeValid(req.body.adminCode)) {
+    return res.status(401).json({ error: 'Clave de administrador incorrecta.' });
+  }
+
+  try {
+    const user = await createAuthorizedUser(req.body.name, req.body.pin);
+    res.json({
+      user: publicUser(user),
+      users: users.map(publicUser)
+    });
+  } catch (error) {
+    res.status(error.statusCode || 500).json({ error: error.message || 'No se pudo crear el usuario.' });
+  }
 });
 
 app.post('/api/admin/results', (req, res) => {

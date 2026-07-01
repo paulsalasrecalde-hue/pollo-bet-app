@@ -6,6 +6,10 @@ const winnersList = document.getElementById('winners-list');
 const adminCodeInput = document.getElementById('admin-code-input');
 const adminLoginBtn = document.getElementById('admin-login-btn');
 const adminLogin = document.getElementById('admin-login');
+const adminUserForm = document.getElementById('admin-user-form');
+const adminUserName = document.getElementById('admin-user-name');
+const adminUserPin = document.getElementById('admin-user-pin');
+const adminUserMessage = document.getElementById('admin-user-message');
 
 let adminCode = '';
 
@@ -118,9 +122,43 @@ adminLoginBtn.addEventListener('click', async () => {
 
   adminCode = typedCode;
   adminLogin.style.display = 'none';
+  adminUserForm.style.display = 'grid';
   resultForm.style.display = 'grid';
   resultMessage.textContent = 'Modo administrador activo.';
   await loadAdminResults();
+});
+
+adminUserForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const name = adminUserName.value.trim();
+  const pin = adminUserPin.value.trim();
+
+  if (!name) {
+    adminUserMessage.textContent = 'Escribe el nombre real del jugador.';
+    adminUserName.focus();
+    return;
+  }
+
+  if (!/^\d{4}$/.test(pin)) {
+    adminUserMessage.textContent = 'El PIN debe tener 4 numeros.';
+    adminUserPin.focus();
+    return;
+  }
+
+  const res = await fetch('/api/admin/users', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ adminCode, name, pin })
+  });
+  const data = await res.json();
+
+  if (!res.ok || data.error) {
+    adminUserMessage.textContent = data.error || 'No se pudo guardar el jugador.';
+    return;
+  }
+
+  adminUserMessage.textContent = `Jugador autorizado: ${data.user.name}`;
+  adminUserForm.reset();
 });
 
 resultForm.addEventListener('submit', async (event) => {
