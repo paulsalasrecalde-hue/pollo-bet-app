@@ -114,7 +114,8 @@ button:hover {
 
 #active-bets-list,
 #proposals-list,
-#participants-list {
+#participants-list,
+#winners-list {
   margin: 0;
   padding-left: 18px;
   display: grid;
@@ -130,6 +131,7 @@ button:hover {
 #active-bets-list li,
 #proposals-list li,
 #participants-list li,
+#winners-list li,
 .match-item {
   background: linear-gradient(180deg, rgba(14, 24, 68, 0.92), rgba(8, 14, 44, 0.9));
   border: 1px solid rgba(57, 255, 136, 0.28);
@@ -182,6 +184,16 @@ button:hover {
 
 .inline-counter-form input {
   padding: 8px 10px;
+}
+
+.score-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+}
+
+#result-message {
+  color: var(--neon-green);
 }
 
 .match-list {
@@ -309,12 +321,14 @@ button:hover {
 
   #active-bets-list,
   #proposals-list,
-  #participants-list {
+  #participants-list,
+  #winners-list {
     padding-left: 0;
     list-style: none;
   }
 
-  .inline-counter-form {
+  .inline-counter-form,
+  .score-grid {
     grid-template-columns: 1fr;
   }
 
@@ -351,6 +365,7 @@ button:hover {
   #active-bets-list li,
   #proposals-list li,
   #participants-list li,
+  #winners-list li,
   .match-item {
     border-radius: 8px;
     padding: 9px;

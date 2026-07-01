@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=20260701-phone-only-layout" />
+    <link rel="stylesheet" href="./styles.css?v=20260701-results-module" />
   </head>
   <body>
     <main class="app-shell">
@@ -69,13 +69,38 @@
         <p id="bet-message"></p>
       </section>
 
+      <section id="results-section" class="card">
+        <h2>3. Resultados y Ganadores</h2>
+        <form id="result-form">
+          <label>
+            Partido finalizado
+            <select id="result-match-select" name="matchId" required>
+              <option value="">Selecciona una apuesta cerrada...</option>
+            </select>
+          </label>
+          <div class="score-grid">
+            <label>
+              Goles equipo 1
+              <input id="home-score-input" name="homeScore" type="number" min="0" required />
+            </label>
+            <label>
+              Goles equipo 2
+              <input id="away-score-input" name="awayScore" type="number" min="0" required />
+            </label>
+          </div>
+          <button id="save-result-btn" type="submit">Guardar resultado</button>
+        </form>
+        <p id="result-message"></p>
+        <ul id="winners-list"></ul>
+      </section>
+
       <section class="card">
-        <h2>3. Quiénes están apostando</h2>
+        <h2>4. Quienes estan apostando</h2>
         <ul id="participants-list"></ul>
       </section>
 
     </main>
 
-    <script src="/app.js?v=20260701-spanish-country-aliases"></script>
+    <script src="/app.js?v=20260701-results-module"></script>
   </body>
 </html>

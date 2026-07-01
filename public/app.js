@@ -19,6 +19,12 @@ const userSetup = document.getElementById('user-setup');
 const userDisplay = document.getElementById('user-display');
 const newBetBtn = document.getElementById('new-bet-btn');
 const betMessage = document.getElementById('bet-message');
+const resultForm = document.getElementById('result-form');
+const resultMatchSelect = document.getElementById('result-match-select');
+const homeScoreInput = document.getElementById('home-score-input');
+const awayScoreInput = document.getElementById('away-score-input');
+const resultMessage = document.getElementById('result-message');
+const winnersList = document.getElementById('winners-list');
 
 let currentUserName = '';
 let currentChallengeId = null;
@@ -613,6 +619,7 @@ async function acceptBetWithName(notification, acceptorName) {
   betMessage.textContent = `Reto cerrado: ${(notification.originalUserName || notification.userName)} vs ${currentUserName}`;
   await loadParticipants();
   await refreshNotifications();
+  await loadResults();
 }
 
 async function submitCounterBet(notification) {
@@ -682,6 +689,67 @@ function renderNotifications(notifications) {
       proposalsList.appendChild(renderNotificationItem(notify));
     });
   }
+}
+
+
+function formatResultText(result) {
+  if (!result) {
+    return 'Resultado pendiente';
+  }
+
+  return `${result.homeTeam} ${result.homeScore} - ${result.awayScore} ${result.awayTeam}`;
+}
+
+function renderResultsPanel(data) {
+  const matches = Array.isArray(data.matches) ? data.matches : [];
+  const winners = Array.isArray(data.winners) ? data.winners : [];
+  const selectedValue = resultMatchSelect.value;
+
+  resultMatchSelect.innerHTML = '<option value="">Selecciona una apuesta cerrada...</option>';
+  matches.forEach((matchId) => {
+    const option = document.createElement('option');
+    option.value = matchId;
+    option.textContent = matchId;
+    resultMatchSelect.appendChild(option);
+  });
+  resultMatchSelect.value = matches.includes(selectedValue) ? selectedValue : '';
+
+  winnersList.innerHTML = '';
+  if (!winners.length) {
+    const empty = document.createElement('li');
+    empty.textContent = 'Aun no hay apuestas cerradas para calcular ganadores.';
+    winnersList.appendChild(empty);
+    return;
+  }
+
+  winners.forEach((winner) => {
+    const item = document.createElement('li');
+    item.className = 'winner-item';
+    const statusText = winner.status === 'winner'
+      ? `Ganador: ${winner.winnerName} con ${winner.winnerTeam}`
+      : winner.status === 'draw'
+        ? 'Empate: no hay ganador directo.'
+        : winner.status === 'no-match'
+          ? 'Resultado guardado, pero no coincide con los equipos apostados.'
+          : 'Pendiente de resultado final.';
+
+    item.innerHTML = `
+      <div class="notification-title">${winner.originalUserName} (${winner.originalTeamName}) vs ${winner.counterUserName || 'pendiente'} (${winner.counterTeamName || 'pendiente'})</div>
+      <div class="notification-details">
+        <strong>Partido:</strong> ${winner.matchId}<br />
+        <strong>Marcador:</strong> ${formatResultText(winner.result)}<br />
+        <strong>Apuesta:</strong> ${winner.amount} presas<br />
+        <strong>${statusText}</strong>
+      </div>
+    `;
+    winnersList.appendChild(item);
+  });
+}
+
+async function loadResults() {
+  const res = await fetch('/api/results');
+  const data = await res.json();
+  renderResultsPanel(data);
 }
 
 function prepareCounterBet(notification) {
@@ -835,6 +903,31 @@ newBetBtn.addEventListener('click', () => {
   unlockUserStepForNewPerson();
 });
 
+resultForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const payload = {
+    matchId: resultMatchSelect.value,
+    homeScore: homeScoreInput.value,
+    awayScore: awayScoreInput.value
+  };
+
+  const res = await fetch('/api/results', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+
+  if (!res.ok || data.error) {
+    resultMessage.textContent = data.error || 'No se pudo guardar el resultado.';
+    return;
+  }
+
+  resultMessage.textContent = 'Resultado guardado. Ganadores actualizados.';
+  resultForm.reset();
+  await loadResults();
+});
+
 setUserBtn.addEventListener('click', async () => {
   let name = userInput.value.trim();
   if (!name) {
@@ -857,5 +950,6 @@ initializeUserSetup();
 loadDailyMatches();
 loadParticipants();
 refreshNotifications();
+loadResults();
 subscribeToNotifications();
 setBetFormEnabled(false);

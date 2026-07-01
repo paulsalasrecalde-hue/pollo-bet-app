@@ -15,6 +15,7 @@ app.use(express.static('public'));
 let users = [];
 let bets = [];
 let notifications = [];
+let matchResults = [];
 let notificationClients = new Set();
 let activeResetDate = getLocalDateKey();
 
@@ -36,6 +37,7 @@ function ensureDailyReset() {
   users = [];
   bets = [];
   notifications = [];
+  matchResults = [];
   activeResetDate = todayKey;
 
   broadcastNotification({
@@ -172,6 +174,71 @@ function getOppositeTeam(matchId, selectedTeam) {
   }
 
   return `Contrario a ${selectedTeam}`;
+}
+
+function getMatchParts(matchId) {
+  return String(matchId || '').split(/\s+vs\s+/i).map((item) => item.trim()).filter(Boolean);
+}
+
+function getResultKey(matchId) {
+  return normalizeMatchText(matchId);
+}
+
+function getStoredResult(matchId) {
+  const key = getResultKey(matchId);
+  return matchResults.find((result) => result.key === key) || null;
+}
+
+function getWinnerTeam(matchId, homeScore, awayScore) {
+  const parts = getMatchParts(matchId);
+  if (parts.length !== 2) {
+    return null;
+  }
+
+  if (homeScore === awayScore) {
+    return 'Empate';
+  }
+
+  return homeScore > awayScore ? parts[0] : parts[1];
+}
+
+function buildWinnerRows() {
+  return bets
+    .filter((bet) => bet.type === 'original' && bet.countered)
+    .map((originalBet) => {
+      const counterBet = bets.find((bet) => bet.type === 'counter' && bet.responseTo === originalBet.id);
+      const result = getStoredResult(originalBet.matchId);
+      const winnerTeam = result ? getWinnerTeam(originalBet.matchId, result.homeScore, result.awayScore) : null;
+      let winnerName = null;
+      let status = 'pending-result';
+
+      if (result && counterBet) {
+        if (winnerTeam === 'Empate') {
+          status = 'draw';
+        } else if (teamMatches(winnerTeam, originalBet.teamName)) {
+          winnerName = originalBet.userName;
+          status = 'winner';
+        } else if (teamMatches(winnerTeam, counterBet.teamName)) {
+          winnerName = counterBet.userName;
+          status = 'winner';
+        } else {
+          status = 'no-match';
+        }
+      }
+
+      return {
+        matchId: originalBet.matchId,
+        amount: originalBet.amount,
+        originalUserName: originalBet.userName,
+        originalTeamName: originalBet.teamName,
+        counterUserName: counterBet?.userName || originalBet.counteredBy || null,
+        counterTeamName: counterBet?.teamName || getOppositeTeam(originalBet.matchId, originalBet.teamName),
+        result,
+        winnerTeam,
+        winnerName,
+        status
+      };
+    });
 }
 
 async function getMatchAvailability(matchId) {
@@ -465,6 +532,54 @@ app.post('/api/counter-bets', async (req, res) => {
   broadcastNotification(notification);
 
   res.json({ bet: counterBet, notification });
+});
+
+app.get('/api/results', (_req, res) => {
+  const matchIds = [...new Set(bets.filter((bet) => bet.type === 'original' && bet.countered).map((bet) => bet.matchId))];
+  res.json({
+    results: matchResults,
+    matches: matchIds,
+    winners: buildWinnerRows()
+  });
+});
+
+app.post('/api/results', (req, res) => {
+  const matchId = String(req.body.matchId || '').trim();
+  const homeScore = Number(req.body.homeScore);
+  const awayScore = Number(req.body.awayScore);
+  const parts = getMatchParts(matchId);
+
+  if (parts.length !== 2 || !Number.isInteger(homeScore) || !Number.isInteger(awayScore) || homeScore < 0 || awayScore < 0) {
+    return res.status(400).json({ error: 'Ingresa partido y marcador final validos.' });
+  }
+
+  const key = getResultKey(matchId);
+  const savedResult = {
+    key,
+    matchId,
+    homeTeam: parts[0],
+    awayTeam: parts[1],
+    homeScore,
+    awayScore,
+    winnerTeam: getWinnerTeam(matchId, homeScore, awayScore),
+    savedAt: new Date().toISOString()
+  };
+  const index = matchResults.findIndex((result) => result.key === key);
+
+  if (index >= 0) {
+    matchResults[index] = savedResult;
+  } else {
+    matchResults.unshift(savedResult);
+  }
+
+  broadcastNotification({
+    id: `result-${Date.now()}`,
+    type: 'result',
+    message: `Resultado guardado: ${matchId} ${homeScore}-${awayScore}.`,
+    createdAt: savedResult.savedAt
+  });
+
+  res.json({ result: savedResult, winners: buildWinnerRows() });
 });
 
 app.get('/api/notifications', (_req, res) => {
