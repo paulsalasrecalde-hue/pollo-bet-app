@@ -16,6 +16,7 @@ let users = [];
 let bets = [];
 let notifications = [];
 let matchResults = [];
+let winnerHistory = [];
 let notificationClients = new Set();
 let activeResetDate = getLocalDateKey();
 
@@ -37,7 +38,6 @@ function ensureDailyReset() {
   users = [];
   bets = [];
   notifications = [];
-  matchResults = [];
   activeResetDate = todayKey;
 
   broadcastNotification({
@@ -239,6 +239,44 @@ function buildWinnerRows() {
         status
       };
     });
+}
+
+function getWinnerHistoryKey(row) {
+  return [
+    getResultKey(row.matchId),
+    normalizeMatchText(row.originalUserName),
+    normalizeMatchText(row.counterUserName),
+    Number(row.amount) || 0
+  ].join('|');
+}
+
+function saveWinnerHistory(rows) {
+  const resolvedAt = new Date().toISOString();
+
+  rows
+    .filter((row) => row.status !== 'pending-result')
+    .forEach((row) => {
+      const historyRow = {
+        ...row,
+        key: getWinnerHistoryKey(row),
+        result: null,
+        resolvedAt
+      };
+      const index = winnerHistory.findIndex((item) => item.key === historyRow.key);
+
+      if (index >= 0) {
+        winnerHistory[index] = historyRow;
+      } else {
+        winnerHistory.unshift(historyRow);
+      }
+    });
+}
+
+function getWinnerRowsForResponse() {
+  const activeRows = buildWinnerRows();
+  const historyKeys = new Set(winnerHistory.map((row) => row.key));
+  const unresolvedActiveRows = activeRows.filter((row) => !historyKeys.has(getWinnerHistoryKey(row)));
+  return [...winnerHistory, ...unresolvedActiveRows];
 }
 
 async function getMatchAvailability(matchId) {
@@ -539,7 +577,7 @@ app.get('/api/results', (_req, res) => {
   res.json({
     results: matchResults,
     matches: matchIds,
-    winners: buildWinnerRows()
+    winners: getWinnerRowsForResponse()
   });
 });
 
@@ -572,14 +610,17 @@ app.post('/api/results', (req, res) => {
     matchResults.unshift(savedResult);
   }
 
+  const resolvedRows = buildWinnerRows().filter((row) => getResultKey(row.matchId) === key);
+  saveWinnerHistory(resolvedRows);
+
   broadcastNotification({
     id: `result-${Date.now()}`,
     type: 'result',
-    message: `Resultado guardado: ${matchId} ${homeScore}-${awayScore}.`,
+    message: `Resultado guardado para ${matchId}.`,
     createdAt: savedResult.savedAt
   });
 
-  res.json({ result: savedResult, winners: buildWinnerRows() });
+  res.json({ result: savedResult, winners: getWinnerRowsForResponse() });
 });
 
 app.get('/api/notifications', (_req, res) => {

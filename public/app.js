@@ -692,14 +692,6 @@ function renderNotifications(notifications) {
 }
 
 
-function formatResultText(result) {
-  if (!result) {
-    return 'Resultado pendiente';
-  }
-
-  return `${result.homeTeam} ${result.homeScore} - ${result.awayScore} ${result.awayTeam}`;
-}
-
 function renderResultsPanel(data) {
   const matches = Array.isArray(data.matches) ? data.matches : [];
   const winners = Array.isArray(data.winners) ? data.winners : [];
@@ -726,7 +718,7 @@ function renderResultsPanel(data) {
     const item = document.createElement('li');
     item.className = 'winner-item';
     const statusText = winner.status === 'winner'
-      ? `Ganador: ${winner.winnerName} con ${winner.winnerTeam}`
+      ? `Ganador: ${winner.winnerName}`
       : winner.status === 'draw'
         ? 'Empate: no hay ganador directo.'
         : winner.status === 'no-match'
@@ -734,12 +726,11 @@ function renderResultsPanel(data) {
           : 'Pendiente de resultado final.';
 
     item.innerHTML = `
-      <div class="notification-title">${winner.originalUserName} (${winner.originalTeamName}) vs ${winner.counterUserName || 'pendiente'} (${winner.counterTeamName || 'pendiente'})</div>
+      <div class="notification-title">${statusText}</div>
       <div class="notification-details">
         <strong>Partido:</strong> ${winner.matchId}<br />
-        <strong>Marcador:</strong> ${formatResultText(winner.result)}<br />
-        <strong>Apuesta:</strong> ${winner.amount} presas<br />
-        <strong>${statusText}</strong>
+        <strong>Apuesta:</strong> ${winner.originalUserName} vs ${winner.counterUserName || 'pendiente'}<br />
+        <strong>Presas:</strong> ${winner.amount}
       </div>
     `;
     winnersList.appendChild(item);
@@ -923,7 +914,7 @@ resultForm.addEventListener('submit', async (event) => {
     return;
   }
 
-  resultMessage.textContent = 'Resultado guardado. Ganadores actualizados.';
+  resultMessage.textContent = 'Ganador guardado en el historial.';
   resultForm.reset();
   await loadResults();
 });
