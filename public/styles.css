@@ -375,3 +375,27 @@ button:hover {
     gap: 12px;
   }
 }
+
+
+.admin-panel {
+  margin-top: 16px;
+}
+
+.admin-panel summary {
+  cursor: pointer;
+  color: var(--neon-cyan);
+  font-weight: 700;
+}
+
+.admin-login {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+@media (max-width: 640px) {
+  .admin-login {
+    grid-template-columns: 1fr;
+  }
+}

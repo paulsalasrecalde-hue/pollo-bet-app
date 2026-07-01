@@ -2,6 +2,7 @@ const express = require('express');
 const app = express();
 const PORT = process.env.PORT || 3000;
 const ALLOW_LIVE_MATCH_BETS = true;
+const ADMIN_CODE = process.env.ADMIN_CODE || 'pollo2026';
 
 app.use(express.json());
 app.use((req, res, next) => {
@@ -20,6 +21,10 @@ let notificationClients = new Set();
 let activeResetDate = getLocalDateKey();
 
 const matches = [];
+
+function isAdminCodeValid(value) {
+  return String(value || '') === ADMIN_CODE;
+}
 
 function getLocalDateKey(value = new Date()) {
   const year = value.getFullYear();
@@ -540,11 +545,33 @@ app.post('/api/counter-bets', async (req, res) => {
 
 app.get('/api/results', (_req, res) => {
   res.json({
+    winners: winnerHistory
+  });
+});
+
+app.post('/api/admin/login', (req, res) => {
+  if (!isAdminCodeValid(req.body.adminCode)) {
+    return res.status(401).json({ error: 'Clave de administrador incorrecta.' });
+  }
+
+  res.json({ ok: true });
+});
+
+app.post('/api/admin/results', (req, res) => {
+  if (!isAdminCodeValid(req.body.adminCode)) {
+    return res.status(401).json({ error: 'Clave de administrador incorrecta.' });
+  }
+
+  res.json({
     winners: getWinnerRowsForResponse()
   });
 });
 
 app.post('/api/results', (req, res) => {
+  if (!isAdminCodeValid(req.body.adminCode)) {
+    return res.status(401).json({ error: 'Solo el administrador puede guardar ganadores.' });
+  }
+
   const winnerKey = String(req.body.winnerKey || '').trim();
   const winnerName = String(req.body.winnerName || '').trim();
   const row = buildWinnerRows().find((item) => item.key === winnerKey);

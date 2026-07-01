@@ -24,10 +24,14 @@ const winnerBetSelect = document.getElementById('winner-bet-select');
 const winnerNameSelect = document.getElementById('winner-name-select');
 const resultMessage = document.getElementById('result-message');
 const winnersList = document.getElementById('winners-list');
+const adminCodeInput = document.getElementById('admin-code-input');
+const adminLoginBtn = document.getElementById('admin-login-btn');
+const adminLogin = document.getElementById('admin-login');
 
 let currentUserName = '';
 let currentChallengeId = null;
 let matchCatalog = []; 
+let adminCode = '';
 
 function sameName(firstName, secondName) {
   return String(firstName || '').trim().toLowerCase() === String(secondName || '').trim().toLowerCase();
@@ -720,27 +724,26 @@ function renderWinnerOptions(winners) {
   winnerNameSelect.value = [...winnerNameSelect.options].some((option) => option.value === selectedWinner) ? selectedWinner : '';
 }
 
-function renderResultsPanel(data) {
+function renderResultsPanel(data, options = {}) {
   const winners = Array.isArray(data.winners) ? data.winners : [];
-  renderWinnerOptions(winners);
+  if (options.admin) {
+    renderWinnerOptions(winners);
+  }
 
+  const visibleWinners = winners.filter((winner) => winner.status === 'winner');
   winnersList.innerHTML = '';
-  if (!winners.length) {
+  if (!visibleWinners.length) {
     const empty = document.createElement('li');
-    empty.textContent = 'Aun no hay apuestas cerradas para registrar ganadores.';
+    empty.textContent = 'Aun no hay ganadores registrados.';
     winnersList.appendChild(empty);
     return;
   }
 
-  winners.forEach((winner) => {
+  visibleWinners.forEach((winner) => {
     const item = document.createElement('li');
     item.className = 'winner-item';
-    const statusText = winner.status === 'winner'
-      ? `Ganador: ${winner.winnerName}`
-      : 'Pendiente de ganador.';
-
     item.innerHTML = `
-      <div class="notification-title">${statusText}</div>
+      <div class="notification-title">Ganador: ${winner.winnerName}</div>
       <div class="notification-details">
         <strong>Partido:</strong> ${winner.matchId}<br />
         <strong>Apuesta:</strong> ${winner.originalUserName} vs ${winner.counterUserName || 'pendiente'}<br />
@@ -755,6 +758,26 @@ async function loadResults() {
   const res = await fetch('/api/results');
   const data = await res.json();
   renderResultsPanel(data);
+}
+
+async function loadAdminResults() {
+  if (!adminCode) {
+    return;
+  }
+
+  const res = await fetch('/api/admin/results', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ adminCode })
+  });
+  const data = await res.json();
+
+  if (!res.ok || data.error) {
+    resultMessage.textContent = data.error || 'No se pudo cargar el panel administrador.';
+    return;
+  }
+
+  renderResultsPanel(data, { admin: true });
 }
 
 function prepareCounterBet(notification) {
@@ -909,14 +932,41 @@ newBetBtn.addEventListener('click', () => {
 });
 
 winnerBetSelect.addEventListener('change', async () => {
-  await loadResults();
+  await loadAdminResults();
+});
+
+adminLoginBtn.addEventListener('click', async () => {
+  const typedCode = adminCodeInput.value.trim();
+  if (!typedCode) {
+    resultMessage.textContent = 'Ingresa la clave de administrador.';
+    return;
+  }
+
+  const res = await fetch('/api/admin/login', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ adminCode: typedCode })
+  });
+  const data = await res.json();
+
+  if (!res.ok || data.error) {
+    resultMessage.textContent = data.error || 'Clave incorrecta.';
+    return;
+  }
+
+  adminCode = typedCode;
+  adminLogin.style.display = 'none';
+  resultForm.style.display = 'grid';
+  resultMessage.textContent = 'Modo administrador activo.';
+  await loadAdminResults();
 });
 
 resultForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const payload = {
     winnerKey: winnerBetSelect.value,
-    winnerName: winnerNameSelect.value
+    winnerName: winnerNameSelect.value,
+    adminCode
   };
 
   const res = await fetch('/api/results', {
@@ -934,6 +984,7 @@ resultForm.addEventListener('submit', async (event) => {
   resultMessage.textContent = 'Ganador guardado en el historial.';
   resultForm.reset();
   await loadResults();
+  await loadAdminResults();
 });
 
 setUserBtn.addEventListener('click', async () => {
