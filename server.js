@@ -62,6 +62,7 @@ async function initDatabase() {
   betHistory = Array.isArray(state.betHistory) ? state.betHistory : betHistory;
   activeResetDate = state.activeResetDate || activeResetDate;
   seedBetHistoryFromActiveBets();
+  seedDuelHistoryFromLegacyRows();
 
   await persistState(['users', 'bets', 'notifications', 'winnerHistory', 'pinRequests', 'betHistory', 'activeResetDate']);
 }
@@ -499,20 +500,96 @@ function updateBetHistorySnapshot(bet) {
   ));
 }
 
+function buildDuelHistoryRow(originalBet, counterBet) {
+  return {
+    historyId: `duel-${originalBet.id}`,
+    action: 'duel',
+    type: 'duel',
+    betId: originalBet.id,
+    originalBetId: originalBet.id,
+    counterBetId: counterBet?.id || null,
+    matchId: originalBet.matchId,
+    amount: originalBet.amount,
+    originalUserName: originalBet.userName,
+    originalTeamName: originalBet.teamName,
+    counterUserName: counterBet?.userName || originalBet.counteredBy || null,
+    counterTeamName: counterBet?.teamName || getOppositeTeam(originalBet.matchId, originalBet.teamName),
+    originalCreatedAt: originalBet.createdAt,
+    counterCreatedAt: counterBet?.createdAt || null,
+    createdAt: counterBet?.createdAt || originalBet.createdAt,
+    recordedAt: new Date().toISOString()
+  };
+}
+
+function rememberDuelHistory(originalBet, counterBet) {
+  if (!originalBet?.countered) {
+    return;
+  }
+
+  const row = buildDuelHistoryRow(originalBet, counterBet);
+  const index = betHistory.findIndex((item) => item.historyId === row.historyId);
+  if (index >= 0) {
+    betHistory[index] = { ...betHistory[index], ...row };
+  } else {
+    betHistory.unshift(row);
+  }
+}
+
 function seedBetHistoryFromActiveBets() {
-  for (const bet of bets) {
-    if (!betHistory.some((item) => item.betId === bet.id)) {
-      rememberBetHistory(bet, 'active-snapshot');
+  const originals = bets.filter((bet) => bet.type === 'original' && bet.countered);
+  for (const originalBet of originals) {
+    const counterBet = bets.find((bet) => bet.type === 'counter' && bet.responseTo === originalBet.id);
+    rememberDuelHistory(originalBet, counterBet);
+  }
+}
+
+function seedDuelHistoryFromLegacyRows() {
+  const legacyAcceptedRows = betHistory.filter((row) => row.action === 'accepted' && row.responseTo);
+  for (const counterRow of legacyAcceptedRows) {
+    if (betHistory.some((row) => row.historyId === `duel-${counterRow.responseTo}`)) {
+      continue;
     }
+
+    const originalRow = betHistory.find((row) => row.betId === counterRow.responseTo);
+    if (!originalRow) {
+      continue;
+    }
+
+    rememberDuelHistory(
+      {
+        id: originalRow.betId,
+        type: 'original',
+        userName: originalRow.userName,
+        matchId: originalRow.matchId,
+        teamName: originalRow.teamName,
+        amount: originalRow.amount,
+        createdAt: originalRow.createdAt,
+        countered: true,
+        counteredBy: counterRow.userName
+      },
+      {
+        id: counterRow.betId,
+        type: 'counter',
+        userName: counterRow.userName,
+        matchId: counterRow.matchId,
+        teamName: counterRow.teamName,
+        amount: counterRow.amount,
+        createdAt: counterRow.createdAt,
+        responseTo: counterRow.responseTo
+      }
+    );
   }
 }
 
 function getBetHistoryForResponse() {
   const activeIds = new Set(bets.map((bet) => bet.id));
+  seedBetHistoryFromActiveBets();
+  seedDuelHistoryFromLegacyRows();
   return betHistory
+    .filter((row) => row.action === 'duel')
     .map((row) => ({
       ...row,
-      active: activeIds.has(row.betId)
+      active: activeIds.has(row.originalBetId || row.betId) || activeIds.has(row.counterBetId)
     }))
     .sort((first, second) => new Date(second.createdAt || second.recordedAt || 0) - new Date(first.createdAt || first.recordedAt || 0));
 }
@@ -955,9 +1032,9 @@ app.post('/api/counter-bets', async (req, res) => {
   };
 
   bets.push(counterBet);
-  rememberBetHistory(counterBet, 'accepted');
   originalBet.countered = true;
   originalBet.counteredBy = user.name;
+  rememberDuelHistory(originalBet, counterBet);
   updateBetHistorySnapshot(originalBet);
 
   const originalNotification = notifications.find((notif) => notif.originalBetId === challengeId && !notif.isCounter);

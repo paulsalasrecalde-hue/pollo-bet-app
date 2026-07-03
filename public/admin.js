@@ -168,7 +168,7 @@ function renderBetHistory(rows) {
 
   if (!rows.length) {
     const empty = document.createElement('li');
-    empty.textContent = 'Aun no hay historial de apuestas.';
+    empty.textContent = 'Aun no hay apuestas aceptadas en el historial.';
     betHistoryList.appendChild(empty);
     return;
   }
@@ -176,14 +176,14 @@ function renderBetHistory(rows) {
   rows.forEach((row) => {
     const item = document.createElement('li');
     item.className = 'notification-item';
-    const actionText = row.action === 'accepted' ? 'Aceptada' : row.action === 'created' ? 'Creada' : 'Registrada';
-    const activeText = row.active ? 'Activa' : 'Historial';
+    const activeText = row.active ? 'Vigente' : 'Guardada';
+    const dateText = new Date(row.counterCreatedAt || row.createdAt || row.recordedAt).toLocaleString('es-ES');
     item.innerHTML = `
-      <div class="notification-title">${actionText}: ${row.userName} - ${row.teamName}</div>
+      <div class="notification-title">${row.originalUserName} (${row.originalTeamName}) vs ${row.counterUserName || 'pendiente'} (${row.counterTeamName || 'contrario'})</div>
       <div class="notification-details">
         <strong>Partido:</strong> ${row.matchId}<br />
         <strong>Presas:</strong> ${row.amount}<br />
-        <strong>Fecha:</strong> ${new Date(row.createdAt || row.recordedAt).toLocaleString('es-ES')}<br />
+        <strong>Aceptada:</strong> ${dateText}<br />
         <strong>Estado:</strong> ${activeText}
       </div>
     `;
