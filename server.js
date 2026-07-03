@@ -1170,6 +1170,11 @@ function broadcastNotification(notification) {
 }
 
 setInterval(ensureDailyReset, 60 * 1000);
+setInterval(() => {
+  applyAutomaticWinners().catch((error) => {
+    console.error('No se pudieron actualizar ganadores automaticos:', error.message);
+  });
+}, 15 * 60 * 1000);
 
 initDatabase()
   .then(() => {
