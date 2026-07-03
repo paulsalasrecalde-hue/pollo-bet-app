@@ -244,6 +244,19 @@ function teamMatches(candidate, selected) {
   return candidateAliases.some((alias) => alias === selectedText);
 }
 
+function canBetOnMatch(state, dateTime) {
+  if (state === 'post') {
+    return false;
+  }
+
+  if (state === 'in') {
+    return ALLOW_LIVE_MATCH_BETS;
+  }
+
+  const eventTime = new Date(dateTime).getTime();
+  return state === 'pre' && Number.isFinite(eventTime) && eventTime > Date.now();
+}
+
 function getOppositeTeam(matchId, selectedTeam) {
   const parts = String(matchId || '').split(/\s+vs\s+/i).map((item) => item.trim()).filter(Boolean);
   if (parts.length !== 2) {
@@ -628,6 +641,21 @@ function getWinnerRowsForResponse() {
   return [...winnerHistory, ...pendingRows];
 }
 
+function hasSavedWinnerForNotification(notification) {
+  if (!notification?.isCounter) {
+    return false;
+  }
+
+  const key = getWinnerHistoryKey({
+    matchId: notification.matchId,
+    originalUserName: notification.originalUserName || notification.userName,
+    counterUserName: notification.counterUserName || notification.counteredBy,
+    amount: notification.amount
+  });
+
+  return winnerHistory.some((row) => row.status === 'winner' && row.key === key);
+}
+
 function validatePin(pin) {
   return /^\d{4}$/.test(String(pin || ''));
 }
@@ -808,11 +836,8 @@ async function getMatchAvailability(matchId) {
         continue;
       }
 
-      const state = competition?.status?.type?.state || '';
-      const eventTime = new Date(event.date).getTime();
-      const startedByTime = Number.isFinite(eventTime) && eventTime <= Date.now();
-      const startedByState = state === 'in' || state === 'post';
-      const canBet = !(startedByTime || startedByState);
+      const state = competition?.status?.type?.state || 'pre';
+      const canBet = canBetOnMatch(state, event.date);
 
       return {
         found: true,
@@ -911,7 +936,7 @@ app.get('/api/daily-matches', async (req, res) => {
           dateTime: event.date,
           status: competition?.status?.type?.shortDetail || competition?.status?.type?.description || 'Programado',
           state: competition?.status?.type?.state || 'pre',
-          canBet: ALLOW_LIVE_MATCH_BETS || ((competition?.status?.type?.state || 'pre') === 'pre' && new Date(event.date).getTime() > Date.now())
+          canBet: canBetOnMatch(competition?.status?.type?.state || 'pre', event.date)
         };
       })
       .filter(Boolean);
@@ -957,8 +982,8 @@ app.post('/api/bets', async (req, res) => {
   }
 
   const availability = await getMatchAvailability(matchText);
-  if (!ALLOW_LIVE_MATCH_BETS && availability.found && !availability.canBet) {
-    return res.status(400).json({ error: 'Este partido ya iniciÃ³ o finalizÃ³. Ya no se pueden hacer apuestas.' });
+  if (availability.found && !availability.canBet) {
+    return res.status(400).json({ error: 'Este partido ya inicio o finalizo. Ya no se pueden hacer apuestas.' });
   }
 
   let user;
@@ -1028,8 +1053,8 @@ app.post('/api/counter-bets', async (req, res) => {
   }
 
   const availability = await getMatchAvailability(originalBet.matchId);
-  if (!ALLOW_LIVE_MATCH_BETS && availability.found && !availability.canBet) {
-    return res.status(400).json({ error: 'Este partido ya iniciÃ³ o finalizÃ³. Ya no se pueden aceptar apuestas.' });
+  if (availability.found && !availability.canBet) {
+    return res.status(400).json({ error: 'Este partido ya inicio o finalizo. Ya no se pueden aceptar apuestas.' });
   }
 
   if (originalBet.countered) {
@@ -1276,8 +1301,15 @@ app.post('/api/admin/manual-winner', async (req, res) => {
   res.json({ winner: savedWinner, winners: getWinnerRowsForResponse() });
 });
 
-app.get('/api/notifications', (_req, res) => {
-  res.json(notifications.slice(0, 10));
+app.get('/api/notifications', async (_req, res) => {
+  try {
+    await applyAutomaticWinners();
+  } catch (_error) {
+    // Keep notifications available even if the external result service is temporarily unavailable.
+  }
+
+  const visibleNotifications = notifications.filter((notification) => !hasSavedWinnerForNotification(notification));
+  res.json(visibleNotifications.slice(0, 10));
 });
 
 app.get('/api/notifications/stream', (req, res) => {
