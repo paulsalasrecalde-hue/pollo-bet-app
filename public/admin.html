@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=20260701-reset-bets" />
+    <link rel="stylesheet" href="./styles.css?v=20260703-ecuador-day-bet-history" />
   </head>
   <body>
     <main class="app-shell">
@@ -39,8 +39,14 @@
 
       <section class="card">
         <h2>Control de apuestas</h2>
-        <button id="reset-bets-btn" type="button" style="display:none;">Borrar todas las apuestas</button>
+        <button id="auto-results-btn" type="button" style="display:none;">Actualizar ganadores automaticos</button>
+        <button id="reset-bets-btn" type="button" style="display:none;">Limpiar apuestas manualmente</button>
         <p id="reset-bets-message"></p>
+      </section>
+
+      <section class="card">
+        <h2>Historial de apuestas</h2>
+        <ul id="bet-history-list"></ul>
       </section>
 
       <section class="card">
@@ -73,6 +79,6 @@
       </section>
     </main>
 
-    <script src="/admin.js?v=20260701-reset-bets"></script>
+    <script src="/admin.js?v=20260703-ecuador-day-bet-history"></script>
   </body>
 </html>

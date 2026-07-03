@@ -116,7 +116,8 @@ button:hover {
 #proposals-list,
 #participants-list,
 #winners-list,
-#pin-requests-list {
+#pin-requests-list,
+#bet-history-list {
   margin: 0;
   padding-left: 18px;
   display: grid;
@@ -134,6 +135,7 @@ button:hover {
 #participants-list li,
 #winners-list li,
 #pin-requests-list li,
+#bet-history-list li,
 .match-item {
   background: linear-gradient(180deg, rgba(14, 24, 68, 0.92), rgba(8, 14, 44, 0.9));
   border: 1px solid rgba(57, 255, 136, 0.28);
@@ -354,7 +356,8 @@ button:hover {
   #proposals-list,
   #participants-list,
   #winners-list,
-  #pin-requests-list {
+  #pin-requests-list,
+  #bet-history-list {
     padding-left: 0;
     list-style: none;
   }
@@ -399,6 +402,7 @@ button:hover {
   #participants-list li,
   #winners-list li,
   #pin-requests-list li,
+  #bet-history-list li,
   .match-item {
     border-radius: 8px;
     padding: 9px;

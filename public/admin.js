@@ -12,7 +12,9 @@ const adminUserPin = document.getElementById('admin-user-pin');
 const adminUserMessage = document.getElementById('admin-user-message');
 const pinRequestsList = document.getElementById('pin-requests-list');
 const resetBetsBtn = document.getElementById('reset-bets-btn');
+const autoResultsBtn = document.getElementById('auto-results-btn');
 const resetBetsMessage = document.getElementById('reset-bets-message');
+const betHistoryList = document.getElementById('bet-history-list');
 
 let adminCode = '';
 let pinRequestTimer = null;
@@ -161,6 +163,55 @@ async function approvePinRequest(requestId) {
   renderPinRequests(Array.isArray(data.pinRequests) ? data.pinRequests : []);
 }
 
+function renderBetHistory(rows) {
+  betHistoryList.innerHTML = '';
+
+  if (!rows.length) {
+    const empty = document.createElement('li');
+    empty.textContent = 'Aun no hay historial de apuestas.';
+    betHistoryList.appendChild(empty);
+    return;
+  }
+
+  rows.forEach((row) => {
+    const item = document.createElement('li');
+    item.className = 'notification-item';
+    const actionText = row.action === 'accepted' ? 'Aceptada' : row.action === 'created' ? 'Creada' : 'Registrada';
+    const activeText = row.active ? 'Activa' : 'Historial';
+    item.innerHTML = `
+      <div class="notification-title">${actionText}: ${row.userName} - ${row.teamName}</div>
+      <div class="notification-details">
+        <strong>Partido:</strong> ${row.matchId}<br />
+        <strong>Presas:</strong> ${row.amount}<br />
+        <strong>Fecha:</strong> ${new Date(row.createdAt || row.recordedAt).toLocaleString('es-ES')}<br />
+        <strong>Estado:</strong> ${activeText}
+      </div>
+    `;
+    betHistoryList.appendChild(item);
+  });
+}
+
+async function loadBetHistory() {
+  if (!adminCode) {
+    renderBetHistory([]);
+    return;
+  }
+
+  const res = await fetch('/api/admin/bet-history', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ adminCode })
+  });
+  const data = await res.json();
+
+  if (!res.ok || data.error) {
+    resetBetsMessage.textContent = data.error || 'No se pudo cargar el historial de apuestas.';
+    return;
+  }
+
+  renderBetHistory(Array.isArray(data.bets) ? data.bets : []);
+}
+
 async function loadAdminResults() {
   if (!adminCode) {
     await loadPublicWinners();
@@ -210,10 +261,12 @@ adminLoginBtn.addEventListener('click', async () => {
   adminCode = typedCode;
   adminLogin.style.display = 'none';
   adminUserForm.style.display = 'grid';
+  autoResultsBtn.style.display = 'inline-block';
   resetBetsBtn.style.display = 'inline-block';
   resultForm.style.display = 'grid';
   resultMessage.textContent = 'Modo administrador activo.';
   await loadPinRequests();
+  await loadBetHistory();
   await loadAdminResults();
 
   if (pinRequestTimer) {
@@ -258,19 +311,51 @@ adminUserForm.addEventListener('submit', async (event) => {
   }
 });
 
+autoResultsBtn.addEventListener('click', async () => {
+  if (!adminCode) {
+    resetBetsMessage.textContent = 'Primero ingresa como administrador.';
+    return;
+  }
+
+  autoResultsBtn.disabled = true;
+  autoResultsBtn.textContent = 'Consultando...';
+  resetBetsMessage.textContent = 'Consultando resultados finales...';
+  try {
+    const res = await fetch('/api/admin/auto-results', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ adminCode })
+    });
+    const data = await res.json();
+
+    if (!res.ok || data.error) {
+      resetBetsMessage.textContent = data.error || 'No se pudieron actualizar los ganadores automaticos.';
+      return;
+    }
+
+    resetBetsMessage.textContent = `Ganadores automaticos guardados: ${Array.isArray(data.resolved) ? data.resolved.length : 0}.`;
+    const winners = Array.isArray(data.winners) ? data.winners : [];
+    renderWinnerOptions(winners);
+    renderWinners(winners);
+  } finally {
+    autoResultsBtn.disabled = false;
+    autoResultsBtn.textContent = 'Actualizar ganadores automaticos';
+  }
+});
+
 resetBetsBtn.addEventListener('click', async () => {
   if (!adminCode) {
     resetBetsMessage.textContent = 'Primero ingresa como administrador.';
     return;
   }
 
-  const confirmed = window.confirm('Esto borrara todas las apuestas actuales. Los usuarios y ganadores guardados se mantienen.');
+  const confirmed = window.confirm('Esto limpiara manualmente las apuestas actuales. Usa esto solo despues de guardar ganadores. El cambio de dia ya no borra apuestas automaticamente.');
   if (!confirmed) {
     return;
   }
 
   resetBetsBtn.disabled = true;
-  resetBetsBtn.textContent = 'Borrando...';
+  resetBetsBtn.textContent = 'Limpiando...';
   try {
     const res = await fetch('/api/admin/reset-bets', {
       method: 'POST',
@@ -285,10 +370,11 @@ resetBetsBtn.addEventListener('click', async () => {
     }
 
     resetBetsMessage.textContent = data.message || 'Apuestas borradas.';
+    await loadBetHistory();
     await loadAdminResults();
   } finally {
     resetBetsBtn.disabled = false;
-    resetBetsBtn.textContent = 'Borrar todas las apuestas';
+    resetBetsBtn.textContent = 'Limpiar apuestas manualmente';
   }
 });
 

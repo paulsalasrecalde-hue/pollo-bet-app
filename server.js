@@ -7,6 +7,7 @@ const ALLOW_LIVE_MATCH_BETS = true;
 const ADMIN_CODE = process.env.ADMIN_CODE || 'pollo2026';
 const PIN_SECRET = process.env.PIN_SECRET || ADMIN_CODE;
 const DATABASE_URL = process.env.DATABASE_URL || '';
+const APP_TIME_ZONE = 'America/Guayaquil';
 
 app.use(express.json());
 app.use((req, res, next) => {
@@ -22,6 +23,7 @@ let bets = [];
 let notifications = [];
 let winnerHistory = [];
 let pinRequests = [];
+let betHistory = [];
 let notificationClients = new Set();
 let activeResetDate = getLocalDateKey();
 
@@ -57,9 +59,11 @@ async function initDatabase() {
   notifications = Array.isArray(state.notifications) ? state.notifications : notifications;
   winnerHistory = Array.isArray(state.winnerHistory) ? state.winnerHistory : winnerHistory;
   pinRequests = Array.isArray(state.pinRequests) ? state.pinRequests : pinRequests;
+  betHistory = Array.isArray(state.betHistory) ? state.betHistory : betHistory;
   activeResetDate = state.activeResetDate || activeResetDate;
+  seedBetHistoryFromActiveBets();
 
-  await persistState(['users', 'bets', 'notifications', 'winnerHistory', 'pinRequests', 'activeResetDate']);
+  await persistState(['users', 'bets', 'notifications', 'winnerHistory', 'pinRequests', 'betHistory', 'activeResetDate']);
 }
 
 async function saveState(key, value) {
@@ -86,6 +90,7 @@ async function persistState(keys) {
     notifications,
     winnerHistory,
     pinRequests,
+    betHistory,
     activeResetDate
   };
 
@@ -99,10 +104,14 @@ function isAdminCodeValid(value) {
 }
 
 function getLocalDateKey(value = new Date()) {
-  const year = value.getFullYear();
-  const month = String(value.getMonth() + 1).padStart(2, '0');
-  const day = String(value.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  const parts = new Intl.DateTimeFormat('en-CA', {
+    timeZone: APP_TIME_ZONE,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit'
+  }).formatToParts(value);
+  const mapped = Object.fromEntries(parts.map((part) => [part.type, part.value]));
+  return `${mapped.year}-${mapped.month}-${mapped.day}`;
 }
 
 async function ensureDailyReset() {
@@ -111,15 +120,13 @@ async function ensureDailyReset() {
     return;
   }
 
-  bets = [];
-  notifications = [];
   activeResetDate = todayKey;
-  await persistState(['bets', 'notifications', 'activeResetDate']);
+  await persistState(['activeResetDate']);
 
   broadcastNotification({
-    id: `daily-reset-${Date.now()}`,
-    type: 'daily-reset',
-    message: 'Las apuestas se reiniciaron por cambio de dia.',
+    id: `day-change-${Date.now()}`,
+    type: 'day-change',
+    message: 'Cambio de dia detectado. Las apuestas anteriores se conservaron para registrar ganadores.',
     createdAt: new Date().toISOString()
   });
 }
@@ -171,6 +178,7 @@ function teamMatches(candidate, selected) {
     bulgaria: ['bulgaria'],
     cameroon: ['camerun'],
     canada: ['canada'],
+    capeverde: ['caboverde'],
     chile: ['chile'],
     china: ['china'],
     colombia: ['colombia'],
@@ -274,8 +282,11 @@ function buildWinnerRows() {
         matchId: originalBet.matchId,
         amount: originalBet.amount,
         originalBetId: originalBet.id,
+        originalCreatedAt: originalBet.createdAt,
         originalUserName: originalBet.userName,
         originalTeamName: originalBet.teamName,
+        counterBetId: counterBet?.id || null,
+        counterCreatedAt: counterBet?.createdAt || null,
         counterUserName: counterBet?.userName || originalBet.counteredBy || null,
         counterTeamName: counterBet?.teamName || getOppositeTeam(originalBet.matchId, originalBet.teamName),
         winnerName: null,
@@ -317,6 +328,193 @@ function saveManualWinner(row, winnerName) {
   }
 
   return historyRow;
+}
+
+async function fetchFinalResult(matchId, dateValue) {
+  const date = getEspnDate(dateValue);
+  const response = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${date}`);
+  if (!response.ok) {
+    return null;
+  }
+
+  const data = await response.json();
+  const events = Array.isArray(data.events) ? data.events : [];
+  const targetMatch = normalizeMatchText(matchId);
+
+  for (const event of events) {
+    const competition = event.competitions?.[0];
+    const competitors = competition?.competitors || [];
+    const home = competitors.find((item) => item.homeAway === 'home');
+    const away = competitors.find((item) => item.homeAway === 'away');
+    const homeName = home?.team?.displayName;
+    const awayName = away?.team?.displayName;
+
+    if (!homeName || !awayName) {
+      continue;
+    }
+
+    const builtMatch = normalizeMatchText(`${homeName} vs ${awayName}`);
+    if (builtMatch !== targetMatch) {
+      continue;
+    }
+
+    const state = competition?.status?.type?.state || '';
+    if (state !== 'post') {
+      return {
+        final: false,
+        status: competition?.status?.type?.shortDetail || competition?.status?.type?.description || 'No finalizado'
+      };
+    }
+
+    const homeScore = Number(home.score);
+    const awayScore = Number(away.score);
+    if (!Number.isFinite(homeScore) || !Number.isFinite(awayScore)) {
+      return null;
+    }
+
+    return {
+      final: true,
+      homeTeam: homeName,
+      awayTeam: awayName,
+      homeScore,
+      awayScore,
+      winnerTeam: homeScore > awayScore ? homeName : awayScore > homeScore ? awayName : null,
+      status: competition?.status?.type?.shortDetail || competition?.status?.type?.description || 'Final'
+    };
+  }
+
+  return null;
+}
+
+function buildResultDates(row) {
+  const dates = new Set();
+  [row.originalCreatedAt, row.counterCreatedAt, new Date()].filter(Boolean).forEach((value) => {
+    dates.add(getEspnDate(value));
+  });
+  return [...dates];
+}
+
+function resolveWinnerFromFinal(row, finalResult) {
+  if (!finalResult?.final || !finalResult.winnerTeam) {
+    return null;
+  }
+
+  if (teamMatches(finalResult.winnerTeam, row.originalTeamName)) {
+    return row.originalUserName;
+  }
+
+  if (teamMatches(finalResult.winnerTeam, row.counterTeamName)) {
+    return row.counterUserName;
+  }
+
+  return null;
+}
+
+async function applyAutomaticWinners() {
+  const rows = buildWinnerRows().filter((row) => row.status !== 'winner');
+  const resolved = [];
+  const unresolved = [];
+
+  for (const row of rows) {
+    let finalResult = null;
+    for (const date of buildResultDates(row)) {
+      finalResult = await fetchFinalResult(row.matchId, date);
+      if (finalResult) {
+        break;
+      }
+    }
+
+    const winnerName = resolveWinnerFromFinal(row, finalResult);
+    if (!winnerName) {
+      unresolved.push({
+        key: row.key,
+        matchId: row.matchId,
+        originalUserName: row.originalUserName,
+        counterUserName: row.counterUserName,
+        reason: finalResult?.final === false ? 'not-final' : finalResult?.winnerTeam ? 'team-not-matched' : 'not-found-or-draw'
+      });
+      continue;
+    }
+
+    const savedWinner = saveManualWinner(
+      {
+        ...row,
+        finalScore: `${finalResult.homeTeam} ${finalResult.homeScore}-${finalResult.awayScore} ${finalResult.awayTeam}`,
+        resolvedBy: 'automatic'
+      },
+      winnerName
+    );
+    if (savedWinner) {
+      savedWinner.finalScore = `${finalResult.homeTeam} ${finalResult.homeScore}-${finalResult.awayScore} ${finalResult.awayTeam}`;
+      savedWinner.resolvedBy = 'automatic';
+      resolved.push(savedWinner);
+    }
+  }
+
+  if (resolved.length) {
+    await persistState(['winnerHistory']);
+  }
+
+  return { resolved, unresolved };
+}
+
+function buildBetHistoryRow(bet, action) {
+  return {
+    historyId: `${action}-${bet.id}`,
+    betId: bet.id,
+    action,
+    type: bet.type,
+    userName: bet.userName,
+    matchId: bet.matchId,
+    teamName: bet.teamName,
+    amount: bet.amount,
+    createdAt: bet.createdAt,
+    responseTo: bet.responseTo || null,
+    countered: Boolean(bet.countered),
+    counteredBy: bet.counteredBy || null,
+    recordedAt: new Date().toISOString()
+  };
+}
+
+function rememberBetHistory(bet, action) {
+  const historyId = `${action}-${bet.id}`;
+  const row = buildBetHistoryRow(bet, action);
+  const index = betHistory.findIndex((item) => item.historyId === historyId);
+  if (index >= 0) {
+    betHistory[index] = { ...betHistory[index], ...row };
+  } else {
+    betHistory.unshift(row);
+  }
+}
+
+function updateBetHistorySnapshot(bet) {
+  betHistory = betHistory.map((item) => (
+    item.betId === bet.id
+      ? {
+          ...item,
+          countered: Boolean(bet.countered),
+          counteredBy: bet.counteredBy || item.counteredBy || null
+        }
+      : item
+  ));
+}
+
+function seedBetHistoryFromActiveBets() {
+  for (const bet of bets) {
+    if (!betHistory.some((item) => item.betId === bet.id)) {
+      rememberBetHistory(bet, 'active-snapshot');
+    }
+  }
+}
+
+function getBetHistoryForResponse() {
+  const activeIds = new Set(bets.map((bet) => bet.id));
+  return betHistory
+    .map((row) => ({
+      ...row,
+      active: activeIds.has(row.betId)
+    }))
+    .sort((first, second) => new Date(second.createdAt || second.recordedAt || 0) - new Date(first.createdAt || first.recordedAt || 0));
 }
 
 function getWinnerRowsForResponse() {
@@ -528,17 +726,20 @@ async function getMatchAvailability(matchId) {
 
 function getEspnDate(value) {
   if (value) {
-    const normalized = String(value).replace(/-/g, '');
-    if (/^\d{8}$/.test(normalized)) {
-      return normalized;
+    const text = String(value);
+    if (/^\d{8}$/.test(text)) {
+      return text;
+    }
+
+    const dateOnly = text.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if (dateOnly) {
+      return `${dateOnly[1]}${dateOnly[2]}${dateOnly[3]}`;
     }
   }
 
-  const today = new Date();
-  const year = today.getFullYear();
-  const month = String(today.getMonth() + 1).padStart(2, '0');
-  const day = String(today.getDate()).padStart(2, '0');
-  return `${year}${month}${day}`;
+  const date = value ? new Date(value) : new Date();
+  const safeDate = Number.isNaN(date.getTime()) ? new Date() : date;
+  return getLocalDateKey(safeDate).replace(/-/g, '');
 }
 
 app.get('/api/health', (_req, res) => {
@@ -653,7 +854,7 @@ app.post('/api/bets', async (req, res) => {
 
   const availability = await getMatchAvailability(matchText);
   if (!ALLOW_LIVE_MATCH_BETS && availability.found && !availability.canBet) {
-    return res.status(400).json({ error: 'Este partido ya inició o finalizó. Ya no se pueden hacer apuestas.' });
+    return res.status(400).json({ error: 'Este partido ya iniciÃ³ o finalizÃ³. Ya no se pueden hacer apuestas.' });
   }
 
   let user;
@@ -675,6 +876,7 @@ app.post('/api/bets', async (req, res) => {
   };
 
   bets.push(bet);
+  rememberBetHistory(bet, 'created');
   const notification = {
     id: Date.now().toString(),
     betId: bet.id,
@@ -682,7 +884,7 @@ app.post('/api/bets', async (req, res) => {
     matchId: bet.matchId,
     teamName: bet.teamName,
     amount: bet.amount,
-    message: `${user.name} creó una apuesta y está esperando respuesta. Puedes responder o ignorar.`,
+    message: `${user.name} creÃ³ una apuesta y estÃ¡ esperando respuesta. Puedes responder o ignorar.`,
     createdAt: bet.createdAt,
     originalBetId: bet.id,
     originalUserName: bet.userName,
@@ -692,7 +894,7 @@ app.post('/api/bets', async (req, res) => {
   };
 
   notifications.unshift(notification);
-  await persistState(['users', 'bets', 'notifications']);
+  await persistState(['users', 'bets', 'notifications', 'betHistory']);
   broadcastNotification(notification);
 
   res.json({ bet, notification });
@@ -723,7 +925,7 @@ app.post('/api/counter-bets', async (req, res) => {
 
   const availability = await getMatchAvailability(originalBet.matchId);
   if (!ALLOW_LIVE_MATCH_BETS && availability.found && !availability.canBet) {
-    return res.status(400).json({ error: 'Este partido ya inició o finalizó. Ya no se pueden aceptar apuestas.' });
+    return res.status(400).json({ error: 'Este partido ya iniciÃ³ o finalizÃ³. Ya no se pueden aceptar apuestas.' });
   }
 
   if (originalBet.countered) {
@@ -753,8 +955,10 @@ app.post('/api/counter-bets', async (req, res) => {
   };
 
   bets.push(counterBet);
+  rememberBetHistory(counterBet, 'accepted');
   originalBet.countered = true;
   originalBet.counteredBy = user.name;
+  updateBetHistorySnapshot(originalBet);
 
   const originalNotification = notifications.find((notif) => notif.originalBetId === challengeId && !notif.isCounter);
   if (originalNotification) {
@@ -782,7 +986,7 @@ app.post('/api/counter-bets', async (req, res) => {
   };
 
   notifications.unshift(notification);
-  await persistState(['users', 'bets', 'notifications']);
+  await persistState(['users', 'bets', 'notifications', 'betHistory']);
   broadcastNotification(notification);
 
   res.json({ bet: counterBet, notification });
@@ -854,6 +1058,41 @@ app.post('/api/admin/results', (req, res) => {
   res.json({
     winners: getWinnerRowsForResponse()
   });
+});
+
+app.post('/api/admin/bet-history', (req, res) => {
+  if (!isAdminCodeValid(req.body.adminCode)) {
+    return res.status(401).json({ error: 'Clave de administrador incorrecta.' });
+  }
+
+  res.json({
+    bets: getBetHistoryForResponse()
+  });
+});
+
+app.post('/api/admin/auto-results', async (req, res) => {
+  if (!isAdminCodeValid(req.body.adminCode)) {
+    return res.status(401).json({ error: 'Clave de administrador incorrecta.' });
+  }
+
+  try {
+    const summary = await applyAutomaticWinners();
+    if (summary.resolved.length) {
+      broadcastNotification({
+        id: `auto-winners-${Date.now()}`,
+        type: 'winner',
+        message: `Ganadores automaticos actualizados: ${summary.resolved.length}.`,
+        createdAt: new Date().toISOString()
+      });
+    }
+
+    res.json({
+      ...summary,
+      winners: getWinnerRowsForResponse()
+    });
+  } catch (_error) {
+    res.status(502).json({ error: 'No se pudieron consultar los resultados finales automaticamente.' });
+  }
 });
 
 app.post('/api/admin/reset-bets', async (req, res) => {
