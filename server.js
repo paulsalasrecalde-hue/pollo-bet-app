@@ -656,6 +656,40 @@ function hasSavedWinnerForNotification(notification) {
   return winnerHistory.some((row) => row.status === 'winner' && row.key === key);
 }
 
+async function isFinishedNotification(notification) {
+  if (!notification?.matchId) {
+    return false;
+  }
+
+  const dates = new Set();
+  [notification.createdAt, notification.originalCreatedAt, new Date()].filter(Boolean).forEach((value) => {
+    dates.add(getEspnDate(value));
+  });
+
+  for (const date of dates) {
+    const finalResult = await fetchFinalResult(notification.matchId, date);
+    if (finalResult?.final) {
+      return true;
+    }
+  }
+
+  const availability = await getMatchAvailability(notification.matchId);
+  return availability.found && availability.state === 'post';
+}
+
+async function getVisibleNotifications() {
+  const checks = await Promise.all(
+    notifications.map(async (notification) => ({
+      notification,
+      finished: await isFinishedNotification(notification)
+    }))
+  );
+
+  return checks
+    .filter(({ notification, finished }) => !finished && !hasSavedWinnerForNotification(notification))
+    .map(({ notification }) => notification);
+}
+
 function validatePin(pin) {
   return /^\d{4}$/.test(String(pin || ''));
 }
@@ -1308,7 +1342,7 @@ app.get('/api/notifications', async (_req, res) => {
     // Keep notifications available even if the external result service is temporarily unavailable.
   }
 
-  const visibleNotifications = notifications.filter((notification) => !hasSavedWinnerForNotification(notification));
+  const visibleNotifications = await getVisibleNotifications();
   res.json(visibleNotifications.slice(0, 10));
 });
 
