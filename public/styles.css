@@ -445,3 +445,130 @@ button:hover {
     grid-template-columns: 1fr;
   }
 }
+
+
+.ad-mega-banner {
+  position: relative;
+  isolation: isolate;
+  display: grid;
+  gap: 3px;
+  margin-top: 16px;
+  padding: 14px 12px;
+  text-align: center;
+  text-decoration: none;
+  text-transform: uppercase;
+  border: 3px solid #fff600;
+  border-radius: 14px;
+  color: #06122e;
+  background:
+    linear-gradient(90deg, #fff600, #ff3ea5, #00f5ff, #39ff88, #fff600);
+  background-size: 320% 100%;
+  box-shadow:
+    0 0 10px #fff600,
+    0 0 22px #ff3ea5,
+    0 0 36px #00f5ff,
+    inset 0 0 16px rgba(255, 255, 255, 0.75);
+  animation:
+    adFlash 0.55s steps(2, end) infinite,
+    adGradient 1.6s linear infinite,
+    adBounce 0.9s ease-in-out infinite;
+  transform-origin: center;
+  overflow: hidden;
+}
+
+.ad-mega-banner::before,
+.ad-mega-banner::after {
+  content: "";
+  position: absolute;
+  inset: -40%;
+  z-index: -1;
+  background:
+    repeating-conic-gradient(from 0deg, rgba(255, 255, 255, 0.85) 0deg 8deg, transparent 8deg 18deg);
+  animation: adSpin 2.2s linear infinite;
+  opacity: 0.42;
+}
+
+.ad-mega-banner::after {
+  inset: 0;
+  background: linear-gradient(110deg, transparent 0%, rgba(255, 255, 255, 0.95) 45%, transparent 62%);
+  animation: adSweep 1.25s ease-in-out infinite;
+  opacity: 0.7;
+}
+
+.ad-burst,
+.ad-main,
+.ad-whatsapp {
+  position: relative;
+  z-index: 1;
+}
+
+.ad-burst {
+  font-size: 0.88rem;
+  font-weight: 1000;
+  letter-spacing: 0;
+}
+
+.ad-main {
+  font-family: "Luckiest Guy", "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 1.8rem;
+  line-height: 1;
+  letter-spacing: 0;
+  color: #ffffff;
+  text-shadow:
+    2px 2px 0 #06122e,
+    -2px 2px 0 #06122e,
+    2px -2px 0 #06122e,
+    -2px -2px 0 #06122e,
+    0 0 12px #ffffff,
+    0 0 22px #fff600;
+}
+
+.ad-whatsapp {
+  justify-self: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  color: #00180c;
+  background: #39ff88;
+  font-weight: 1000;
+  box-shadow: 0 0 16px rgba(57, 255, 136, 0.9);
+}
+
+.ad-mega-banner:hover {
+  filter: saturate(1.35) brightness(1.15);
+}
+
+@keyframes adFlash {
+  0%, 100% { outline: 3px solid #ff3ea5; }
+  50% { outline: 7px solid #00f5ff; }
+}
+
+@keyframes adGradient {
+  from { background-position: 0% 50%; }
+  to { background-position: 320% 50%; }
+}
+
+@keyframes adBounce {
+  0%, 100% { transform: scale(1) rotate(-1deg); }
+  50% { transform: scale(1.045) rotate(1deg); }
+}
+
+@keyframes adSpin {
+  to { transform: rotate(360deg); }
+}
+
+@keyframes adSweep {
+  0% { transform: translateX(-120%); }
+  100% { transform: translateX(120%); }
+}
+
+@media (max-width: 640px) {
+  .ad-mega-banner {
+    margin-top: 12px;
+    padding: 12px 8px;
+    border-radius: 12px;
+  }
+
+  .ad-main {
+    font-size: 1.35rem;
+  }
+}
