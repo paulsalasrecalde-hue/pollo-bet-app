@@ -7,7 +7,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Luckiest+Guy&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css?v=20260703-admin-access-first" />
+    <link rel="stylesheet" href="./styles.css?v=20260703-manual-winner" />
   </head>
   <body>
     <main class="app-shell">
@@ -75,6 +75,25 @@
           </label>
           <button id="save-result-btn" type="submit">Guardar ganador</button>
         </form>
+        <form id="manual-winner-form" style="display:none;">
+          <label>
+            Ganador
+            <input id="manual-winner-name" type="text" maxlength="40" placeholder="Nombre del ganador" required />
+          </label>
+          <label>
+            Partido
+            <input id="manual-winner-match" type="text" maxlength="80" placeholder="Ejemplo: Ecuador vs Brasil" required />
+          </label>
+          <label>
+            Apuesta
+            <input id="manual-winner-bet" type="text" maxlength="120" placeholder="Ejemplo: Juan vs Pedro" required />
+          </label>
+          <label>
+            Presas
+            <input id="manual-winner-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="Presas" required />
+          </label>
+          <button id="save-manual-winner-btn" type="submit">Guardar ganador manual</button>
+        </form>
       </section>
 
       <section class="card">
@@ -83,6 +102,6 @@
       </section>
     </main>
 
-    <script src="/admin.js?v=20260703-admin-access-first"></script>
+    <script src="/admin.js?v=20260703-manual-winner"></script>
   </body>
 </html>

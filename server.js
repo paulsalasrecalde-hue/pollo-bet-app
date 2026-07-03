@@ -331,6 +331,33 @@ function saveManualWinner(row, winnerName) {
   return historyRow;
 }
 
+function saveAdHocWinner({ winnerName, matchId, betDescription, amount }) {
+  const normalizedWinner = String(winnerName || '').trim();
+  const normalizedMatch = String(matchId || '').trim();
+  const normalizedBet = String(betDescription || '').trim();
+  const normalizedAmount = Number(amount);
+
+  if (!normalizedWinner || !normalizedMatch || !normalizedBet || !Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+    return null;
+  }
+
+  const historyRow = {
+    key: `manual|${Date.now()}|${normalizeMatchText(normalizedMatch)}|${normalizeMatchText(normalizedBet)}`,
+    matchId: normalizedMatch,
+    amount: normalizedAmount,
+    originalUserName: normalizedBet,
+    counterUserName: '',
+    betDescription: normalizedBet,
+    winnerName: normalizedWinner,
+    status: 'winner',
+    resolvedBy: 'manual-entry',
+    resolvedAt: new Date().toISOString()
+  };
+
+  winnerHistory.unshift(historyRow);
+  return historyRow;
+}
+
 async function fetchFinalResult(matchId, dateValue) {
   const date = getEspnDate(dateValue);
   const response = await fetch(`https://site.api.espn.com/apis/site/v2/sports/soccer/fifa.world/scoreboard?dates=${date}`);
@@ -1209,6 +1236,34 @@ app.post('/api/results', async (req, res) => {
   if (!savedWinner) {
     return res.status(400).json({ error: 'El ganador debe ser una de las dos personas de la apuesta.' });
   }
+  await persistState(['winnerHistory']);
+
+  broadcastNotification({
+    id: `winner-${Date.now()}`,
+    type: 'winner',
+    message: `Ganador guardado: ${savedWinner.winnerName}.`,
+    createdAt: savedWinner.resolvedAt
+  });
+
+  res.json({ winner: savedWinner, winners: getWinnerRowsForResponse() });
+});
+
+app.post('/api/admin/manual-winner', async (req, res) => {
+  if (!isAdminCodeValid(req.body.adminCode)) {
+    return res.status(401).json({ error: 'Solo el administrador puede guardar ganadores.' });
+  }
+
+  const savedWinner = saveAdHocWinner({
+    winnerName: req.body.winnerName,
+    matchId: req.body.matchId,
+    betDescription: req.body.betDescription,
+    amount: req.body.amount
+  });
+
+  if (!savedWinner) {
+    return res.status(400).json({ error: 'Completa ganador, partido, apuesta y presas.' });
+  }
+
   await persistState(['winnerHistory']);
 
   broadcastNotification({

@@ -1,6 +1,11 @@
 const resultForm = document.getElementById('result-form');
+const manualWinnerForm = document.getElementById('manual-winner-form');
 const winnerBetSelect = document.getElementById('winner-bet-select');
 const winnerNameSelect = document.getElementById('winner-name-select');
+const manualWinnerName = document.getElementById('manual-winner-name');
+const manualWinnerMatch = document.getElementById('manual-winner-match');
+const manualWinnerBet = document.getElementById('manual-winner-bet');
+const manualWinnerAmount = document.getElementById('manual-winner-amount');
 const resultMessage = document.getElementById('result-message');
 const winnersList = document.getElementById('winners-list');
 const adminCodeInput = document.getElementById('admin-code-input');
@@ -62,11 +67,12 @@ function renderWinners(winners) {
   visibleWinners.forEach((winner) => {
     const item = document.createElement('li');
     item.className = 'winner-item';
+    const betText = winner.betDescription || `${winner.originalUserName} vs ${winner.counterUserName || 'pendiente'}`;
     item.innerHTML = `
       <div class="notification-title">Ganador: ${winner.winnerName}</div>
       <div class="notification-details">
         <strong>Partido:</strong> ${winner.matchId}<br />
-        <strong>Apuesta:</strong> ${winner.originalUserName} vs ${winner.counterUserName || 'pendiente'}<br />
+        <strong>Apuesta:</strong> ${betText}<br />
         <strong>Presas:</strong> ${winner.amount}
       </div>
     `;
@@ -264,6 +270,7 @@ adminLoginBtn.addEventListener('click', async () => {
   autoResultsBtn.style.display = 'inline-block';
   resetBetsBtn.style.display = 'inline-block';
   resultForm.style.display = 'grid';
+  manualWinnerForm.style.display = 'grid';
   resultMessage.textContent = 'Modo administrador activo.';
   await loadPinRequests();
   await loadBetHistory();
@@ -401,6 +408,35 @@ resultForm.addEventListener('submit', async (event) => {
   resultMessage.textContent = 'Ganador guardado en el historial.';
   resultForm.reset();
   await loadAdminResults();
+});
+
+manualWinnerForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const payload = {
+    winnerName: manualWinnerName.value.trim(),
+    matchId: manualWinnerMatch.value.trim(),
+    betDescription: manualWinnerBet.value.trim(),
+    amount: manualWinnerAmount.value,
+    adminCode
+  };
+
+  const res = await fetch('/api/admin/manual-winner', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  const data = await res.json();
+
+  if (!res.ok || data.error) {
+    resultMessage.textContent = data.error || 'No se pudo guardar el ganador manual.';
+    return;
+  }
+
+  resultMessage.textContent = 'Ganador manual guardado en el historial.';
+  manualWinnerForm.reset();
+  const winners = Array.isArray(data.winners) ? data.winners : [];
+  renderWinnerOptions(winners);
+  renderWinners(winners);
 });
 
 loadPublicWinners();

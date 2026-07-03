@@ -733,11 +733,12 @@ function renderResultsPanel(data) {
   winners.forEach((winner) => {
     const item = document.createElement('li');
     item.className = 'winner-item';
+    const betText = winner.betDescription || `${winner.originalUserName} vs ${winner.counterUserName || 'pendiente'}`;
     item.innerHTML = `
       <div class="notification-title">Ganador: ${winner.winnerName}</div>
       <div class="notification-details">
         <strong>Partido:</strong> ${winner.matchId}<br />
-        <strong>Apuesta:</strong> ${winner.originalUserName} vs ${winner.counterUserName || 'pendiente'}<br />
+        <strong>Apuesta:</strong> ${betText}<br />
         <strong>Presas:</strong> ${winner.amount}
       </div>
     `;
