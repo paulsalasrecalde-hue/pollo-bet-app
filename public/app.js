@@ -27,6 +27,9 @@ const pinRequestName = document.getElementById('pin-request-name');
 const pinRequestPin = document.getElementById('pin-request-pin');
 const sendPinRequestBtn = document.getElementById('send-pin-request-btn');
 
+const FIXED_BET_AMOUNT = 1;
+const FIXED_BET_LABEL = 'Cuarto de Pollo';
+
 let currentUserName = '';
 let currentChallengeId = null;
 let currentUserPin = '';
@@ -136,6 +139,7 @@ function setBetFormEnabled(enabled) {
   matchSelect.disabled = !enabled;
   teamSelect.disabled = !enabled;
   amountInput.disabled = !enabled;
+  amountInput.value = String(FIXED_BET_AMOUNT);
   createBetBtn.disabled = !enabled;
 
   bettingSection.classList.toggle('is-locked', !enabled);
@@ -311,7 +315,7 @@ function renderNotificationItem(notify) {
     : '';
   details.innerHTML = `
     <strong>Partido:</strong> ${notify.matchId}<br />
-    <strong>Apuesta:</strong> ${amountText} presas<br />
+    <strong>Apuesta:</strong> ${FIXED_BET_LABEL}<br />
     ${teamLine}
   `;
   item.appendChild(details);
@@ -345,8 +349,8 @@ function renderNotificationItem(notify) {
       const autoInfo = document.createElement('div');
       autoInfo.className = 'notification-status';
       autoInfo.textContent = oppositeTeam
-        ? `Aceptación automática: ${oppositeTeam} · ${amountText} presas.`
-        : `Aceptación automática: equipo contrario · ${amountText} presas.`;
+        ? `Aceptación automática: ${oppositeTeam} · ${FIXED_BET_LABEL}.`
+        : `Aceptación automática: equipo contrario · ${FIXED_BET_LABEL}.`;
 
       const submitButton = document.createElement('button');
       submitButton.type = 'submit';
@@ -414,7 +418,7 @@ function renderNotificationItem(notify) {
   details.className = 'notification-details';
   details.innerHTML = `
     <strong>Partido:</strong> ${notify.matchId}<br />
-    <strong>Apuesta:</strong> ${amountText} presas<br />
+    <strong>Apuesta:</strong> ${FIXED_BET_LABEL}<br />
     ${!isAccepted ? `<br /><strong>Equipo:</strong> ${notify.teamName}` : ''}
   `;
   item.appendChild(details);
@@ -452,8 +456,8 @@ function renderNotificationItem(notify) {
   const autoInfo = document.createElement('div');
   autoInfo.className = 'notification-status';
   autoInfo.textContent = oppositeTeam
-    ? `Automatico: aceptas con ${oppositeTeam} por ${amountText} presas.`
-    : `Automatico: aceptas con el equipo contrario por ${amountText} presas.`;
+    ? `Automatico: aceptas con ${oppositeTeam} por ${FIXED_BET_LABEL}.`
+    : `Automatico: aceptas con el equipo contrario por ${FIXED_BET_LABEL}.`;
 
   actionButton.addEventListener('click', async () => {
     actionButton.disabled = true;
@@ -512,7 +516,7 @@ function renderNotificationItem(notify) {
   details.className = 'notification-details';
   details.innerHTML = `
     <strong>Partido:</strong> ${notify.matchId}<br />
-    <strong>Apuesta:</strong> ${amountText} presas
+    <strong>Apuesta:</strong> ${FIXED_BET_LABEL}
   `;
   item.appendChild(details);
 
@@ -563,8 +567,8 @@ function renderNotificationItem(notify) {
   status.textContent = isOwnBet
     ? 'Esta propuesta es tuya. Debe aceptarla otra persona.'
     : (oppositeTeam
-      ? `Acepta con ${oppositeTeam} por ${amountText} presas.`
-      : `Acepta como contrario a ${notify.teamName} por ${amountText} presas.`);
+      ? `Acepta con ${oppositeTeam} por ${FIXED_BET_LABEL}.`
+      : `Acepta como contrario a ${notify.teamName} por ${FIXED_BET_LABEL}.`);
 
   acceptForm.appendChild(acceptNameInput);
   acceptForm.appendChild(acceptPinInput);
@@ -739,7 +743,7 @@ function renderResultsPanel(data) {
       <div class="notification-details">
         <strong>Partido:</strong> ${winner.matchId}<br />
         <strong>Apuesta:</strong> ${betText}<br />
-        <strong>Presas:</strong> ${winner.amount}
+        <strong>Apuesta:</strong> ${FIXED_BET_LABEL}
       </div>
     `;
     winnersList.appendChild(item);
@@ -791,7 +795,7 @@ async function loadParticipants() {
   participants.forEach((participant) => {
     const item = document.createElement('li');
     const latestBet = participant.latestBet;
-    item.textContent = `${participant.name} · ${latestBet ? `${latestBet.teamName} · ${latestBet.amount} presas` : 'sin apuesta aún'}`;
+    item.textContent = `${participant.name} · ${latestBet ? `${latestBet.teamName} · ${FIXED_BET_LABEL}` : 'sin apuesta aún'}`;
     participantsList.appendChild(item);
   });
 }
@@ -869,7 +873,7 @@ betForm.addEventListener('submit', async (event) => {
     pin: currentUserPin,
     matchId: formData.get('matchId'),
     teamName: formData.get('teamName'),
-    amount: formData.get('amount')
+    amount: FIXED_BET_AMOUNT
   };
 
   const endpoint = currentChallengeId ? '/api/counter-bets' : '/api/bets';
@@ -898,6 +902,7 @@ betForm.addEventListener('submit', async (event) => {
   }
 
   betForm.reset();
+  amountInput.value = String(FIXED_BET_AMOUNT);
   loadParticipants();
   refreshNotifications();
 });

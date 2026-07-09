@@ -5,6 +5,7 @@ const app = express();
 const PORT = process.env.PORT || 3000;
 const ALLOW_LIVE_MATCH_BETS = true;
 const ADMIN_CODE = process.env.ADMIN_CODE || 'pollo2026';
+const FIXED_BET_AMOUNT = 1;
 const PIN_SECRET = process.env.PIN_SECRET || ADMIN_CODE;
 const DATABASE_URL = process.env.DATABASE_URL || '';
 const APP_TIME_ZONE = 'America/Guayaquil';
@@ -344,13 +345,13 @@ function saveManualWinner(row, winnerName) {
   return historyRow;
 }
 
-function saveAdHocWinner({ winnerName, matchId, betDescription, amount }) {
+function saveAdHocWinner({ winnerName, matchId, betDescription }) {
   const normalizedWinner = String(winnerName || '').trim();
   const normalizedMatch = String(matchId || '').trim();
   const normalizedBet = String(betDescription || '').trim();
-  const normalizedAmount = Number(amount);
+  const normalizedAmount = FIXED_BET_AMOUNT;
 
-  if (!normalizedWinner || !normalizedMatch || !normalizedBet || !Number.isFinite(normalizedAmount) || normalizedAmount <= 0) {
+  if (!normalizedWinner || !normalizedMatch || !normalizedBet) {
     return null;
   }
 
@@ -1002,12 +1003,12 @@ app.get('/api/participants', (_req, res) => {
 });
 
 app.post('/api/bets', async (req, res) => {
-  const { userName, pin, matchId, teamName, amount } = req.body;
+  const { userName, pin, matchId, teamName } = req.body;
   const matchText = String(matchId || '').trim();
   const teamText = String(teamName || '').trim();
-  const amountValue = Number(amount);
+  const amountValue = FIXED_BET_AMOUNT;
 
-  if (!userName || !matchText || !teamText || !amountValue || amountValue <= 0) {
+  if (!userName || !matchText || !teamText) {
     return res.status(400).json({ error: 'Faltan datos validos para crear la apuesta.' });
   }
 
@@ -1320,7 +1321,7 @@ app.post('/api/admin/manual-winner', async (req, res) => {
   });
 
   if (!savedWinner) {
-    return res.status(400).json({ error: 'Completa ganador, partido, apuesta y presas.' });
+    return res.status(400).json({ error: 'Completa ganador, partido y apuesta.' });
   }
 
   await persistState(['winnerHistory']);

@@ -89,8 +89,10 @@
             <input id="manual-winner-bet" type="text" maxlength="120" placeholder="Ejemplo: Juan vs Pedro" required />
           </label>
           <label>
-            Presas
-            <input id="manual-winner-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="Presas" required />
+            Apuesta
+            <select id="manual-winner-amount" required>
+              <option value="1" selected>Cuarto de Pollo</option>
+            </select>
           </label>
           <button id="save-manual-winner-btn" type="submit">Guardar ganador manual</button>
         </form>
@@ -102,6 +104,6 @@
       </section>
     </main>
 
-    <script src="/admin.js?v=20260703-manual-winner"></script>
+    <script src="/admin.js?v=20260709-cuarto-pollo"></script>
   </body>
 </html>

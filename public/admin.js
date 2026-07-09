@@ -23,6 +23,8 @@ const betHistoryList = document.getElementById('bet-history-list');
 
 let adminCode = '';
 let pinRequestTimer = null;
+const FIXED_BET_AMOUNT = 1;
+const FIXED_BET_LABEL = 'Cuarto de Pollo';
 
 function renderWinnerOptions(winners) {
   const selectedBet = winnerBetSelect.value;
@@ -73,7 +75,7 @@ function renderWinners(winners) {
       <div class="notification-details">
         <strong>Partido:</strong> ${winner.matchId}<br />
         <strong>Apuesta:</strong> ${betText}<br />
-        <strong>Presas:</strong> ${winner.amount}
+        <strong>Apuesta:</strong> ${FIXED_BET_LABEL}
       </div>
     `;
     winnersList.appendChild(item);
@@ -188,7 +190,7 @@ function renderBetHistory(rows) {
       <div class="notification-title">${row.originalUserName} (${row.originalTeamName}) vs ${row.counterUserName || 'pendiente'} (${row.counterTeamName || 'contrario'})</div>
       <div class="notification-details">
         <strong>Partido:</strong> ${row.matchId}<br />
-        <strong>Presas:</strong> ${row.amount}<br />
+        <strong>Apuesta:</strong> ${FIXED_BET_LABEL}<br />
         <strong>Aceptada:</strong> ${dateText}<br />
         <strong>Estado:</strong> ${activeText}
       </div>
@@ -416,7 +418,7 @@ manualWinnerForm.addEventListener('submit', async (event) => {
     winnerName: manualWinnerName.value.trim(),
     matchId: manualWinnerMatch.value.trim(),
     betDescription: manualWinnerBet.value.trim(),
-    amount: manualWinnerAmount.value,
+    amount: FIXED_BET_AMOUNT,
     adminCode
   };
 
@@ -434,6 +436,7 @@ manualWinnerForm.addEventListener('submit', async (event) => {
 
   resultMessage.textContent = 'Ganador manual guardado en el historial.';
   manualWinnerForm.reset();
+  manualWinnerAmount.value = String(FIXED_BET_AMOUNT);
   const winners = Array.isArray(data.winners) ? data.winners : [];
   renderWinnerOptions(winners);
   renderWinners(winners);
