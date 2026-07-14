@@ -30,6 +30,15 @@ const sendPinRequestBtn = document.getElementById('send-pin-request-btn');
 const FIXED_BET_AMOUNT = 1;
 const FIXED_BET_LABEL = 'Medio Pollo';
 
+function getBetLabel(item = {}) {
+  if (item.betLabel) {
+    return item.betLabel;
+  }
+
+  const amount = Number(item.amount) || 1;
+  return amount === 1 ? FIXED_BET_LABEL : `${amount} presas de pollo`;
+}
+
 let currentUserName = '';
 let currentChallengeId = null;
 let currentUserPin = '';
@@ -315,7 +324,7 @@ function renderNotificationItem(notify) {
     : '';
   details.innerHTML = `
     <strong>Partido:</strong> ${notify.matchId}<br />
-    <strong>Apuesta:</strong> ${FIXED_BET_LABEL}<br />
+    <strong>Apuesta:</strong> ${getBetLabel(notify)}<br />
     ${teamLine}
   `;
   item.appendChild(details);
@@ -349,8 +358,8 @@ function renderNotificationItem(notify) {
       const autoInfo = document.createElement('div');
       autoInfo.className = 'notification-status';
       autoInfo.textContent = oppositeTeam
-        ? `Aceptación automática: ${oppositeTeam} · ${FIXED_BET_LABEL}.`
-        : `Aceptación automática: equipo contrario · ${FIXED_BET_LABEL}.`;
+        ? `Aceptación automática: ${oppositeTeam} · ${getBetLabel(notify)}.`
+        : `Aceptación automática: equipo contrario · ${getBetLabel(notify)}.`;
 
       const submitButton = document.createElement('button');
       submitButton.type = 'submit';
@@ -418,7 +427,7 @@ function renderNotificationItem(notify) {
   details.className = 'notification-details';
   details.innerHTML = `
     <strong>Partido:</strong> ${notify.matchId}<br />
-    <strong>Apuesta:</strong> ${FIXED_BET_LABEL}<br />
+    <strong>Apuesta:</strong> ${getBetLabel(notify)}<br />
     ${!isAccepted ? `<br /><strong>Equipo:</strong> ${notify.teamName}` : ''}
   `;
   item.appendChild(details);
@@ -456,8 +465,8 @@ function renderNotificationItem(notify) {
   const autoInfo = document.createElement('div');
   autoInfo.className = 'notification-status';
   autoInfo.textContent = oppositeTeam
-    ? `Automatico: aceptas con ${oppositeTeam} por ${FIXED_BET_LABEL}.`
-    : `Automatico: aceptas con el equipo contrario por ${FIXED_BET_LABEL}.`;
+    ? `Automatico: aceptas con ${oppositeTeam} por ${getBetLabel(notify)}.`
+    : `Automatico: aceptas con el equipo contrario por ${getBetLabel(notify)}.`;
 
   actionButton.addEventListener('click', async () => {
     actionButton.disabled = true;
@@ -516,7 +525,7 @@ function renderNotificationItem(notify) {
   details.className = 'notification-details';
   details.innerHTML = `
     <strong>Partido:</strong> ${notify.matchId}<br />
-    <strong>Apuesta:</strong> ${FIXED_BET_LABEL}
+    <strong>Apuesta:</strong> ${getBetLabel(notify)}
   `;
   item.appendChild(details);
 
@@ -567,8 +576,8 @@ function renderNotificationItem(notify) {
   status.textContent = isOwnBet
     ? 'Esta propuesta es tuya. Debe aceptarla otra persona.'
     : (oppositeTeam
-      ? `Acepta con ${oppositeTeam} por ${FIXED_BET_LABEL}.`
-      : `Acepta como contrario a ${notify.teamName} por ${FIXED_BET_LABEL}.`);
+      ? `Acepta con ${oppositeTeam} por ${getBetLabel(notify)}.`
+      : `Acepta como contrario a ${notify.teamName} por ${getBetLabel(notify)}.`);
 
   acceptForm.appendChild(acceptNameInput);
   acceptForm.appendChild(acceptPinInput);
@@ -742,8 +751,8 @@ function renderResultsPanel(data) {
       <div class="notification-title">Ganador: ${winner.winnerName}</div>
       <div class="notification-details">
         <strong>Partido:</strong> ${winner.matchId}<br />
-        <strong>Apuesta:</strong> ${betText}<br />
-        <strong>Apuesta:</strong> ${FIXED_BET_LABEL}
+        <strong>Duelo:</strong> ${betText}<br />
+        <strong>Tipo de apuesta:</strong> ${getBetLabel(winner)}
       </div>
     `;
     winnersList.appendChild(item);
@@ -795,7 +804,7 @@ async function loadParticipants() {
   participants.forEach((participant) => {
     const item = document.createElement('li');
     const latestBet = participant.latestBet;
-    item.textContent = `${participant.name} · ${latestBet ? `${latestBet.teamName} · ${FIXED_BET_LABEL}` : 'sin apuesta aún'}`;
+    item.textContent = `${participant.name} · ${latestBet ? `${latestBet.teamName} · ${getBetLabel(latestBet)}` : 'sin apuesta aún'}`;
     participantsList.appendChild(item);
   });
 }

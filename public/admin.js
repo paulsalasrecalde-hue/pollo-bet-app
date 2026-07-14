@@ -26,6 +26,15 @@ let pinRequestTimer = null;
 const FIXED_BET_AMOUNT = 1;
 const FIXED_BET_LABEL = 'Medio Pollo';
 
+function getBetLabel(item = {}) {
+  if (item.betLabel) {
+    return item.betLabel;
+  }
+
+  const amount = Number(item.amount) || 1;
+  return amount === 1 ? FIXED_BET_LABEL : `${amount} presas de pollo`;
+}
+
 function renderWinnerOptions(winners) {
   const selectedBet = winnerBetSelect.value;
   const selectedWinner = winnerNameSelect.value;
@@ -74,8 +83,8 @@ function renderWinners(winners) {
       <div class="notification-title">Ganador: ${winner.winnerName}</div>
       <div class="notification-details">
         <strong>Partido:</strong> ${winner.matchId}<br />
-        <strong>Apuesta:</strong> ${betText}<br />
-        <strong>Apuesta:</strong> ${FIXED_BET_LABEL}
+        <strong>Duelo:</strong> ${betText}<br />
+        <strong>Tipo de apuesta:</strong> ${getBetLabel(winner)}
       </div>
     `;
     winnersList.appendChild(item);
@@ -190,7 +199,7 @@ function renderBetHistory(rows) {
       <div class="notification-title">${row.originalUserName} (${row.originalTeamName}) vs ${row.counterUserName || 'pendiente'} (${row.counterTeamName || 'contrario'})</div>
       <div class="notification-details">
         <strong>Partido:</strong> ${row.matchId}<br />
-        <strong>Apuesta:</strong> ${FIXED_BET_LABEL}<br />
+        <strong>Apuesta:</strong> ${getBetLabel(row)}<br />
         <strong>Aceptada:</strong> ${dateText}<br />
         <strong>Estado:</strong> ${activeText}
       </div>

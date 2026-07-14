@@ -6,6 +6,9 @@ const PORT = process.env.PORT || 3000;
 const ALLOW_LIVE_MATCH_BETS = true;
 const ADMIN_CODE = process.env.ADMIN_CODE || 'pollo2026';
 const FIXED_BET_AMOUNT = 1;
+const CURRENT_BET_LABEL = 'Medio Pollo';
+const CUARTO_POLLO_START = new Date('2026-07-09T00:00:00-05:00').getTime();
+const MEDIO_POLLO_START = new Date('2026-07-14T00:00:00-05:00').getTime();
 const PIN_SECRET = process.env.PIN_SECRET || ADMIN_CODE;
 const DATABASE_URL = process.env.DATABASE_URL || '';
 const APP_TIME_ZONE = 'America/Guayaquil';
@@ -258,6 +261,34 @@ function canBetOnMatch(state, dateTime) {
   return state === 'pre' && Number.isFinite(eventTime) && eventTime > Date.now();
 }
 
+function getBetLabel(row = {}) {
+  if (row.betLabel) {
+    return row.betLabel;
+  }
+
+  const dateValue = row.originalCreatedAt || row.createdAt || row.counterCreatedAt || row.recordedAt || row.resolvedAt;
+  const timestamp = new Date(dateValue || 0).getTime();
+  if (Number.isFinite(timestamp)) {
+    if (timestamp >= MEDIO_POLLO_START) {
+      return 'Medio Pollo';
+    }
+
+    if (timestamp >= CUARTO_POLLO_START) {
+      return 'Cuarto de Pollo';
+    }
+  }
+
+  const amount = Number(row.amount) || 1;
+  return amount === 1 ? '1 presa de pollo' : `${amount} presas de pollo`;
+}
+
+function withBetLabel(row) {
+  return {
+    ...row,
+    betLabel: getBetLabel(row)
+  };
+}
+
 function getOppositeTeam(matchId, selectedTeam) {
   const parts = String(matchId || '').split(/\s+vs\s+/i).map((item) => item.trim()).filter(Boolean);
   if (parts.length !== 2) {
@@ -296,6 +327,7 @@ function buildWinnerRows() {
         key: historyKey,
         matchId: originalBet.matchId,
         amount: originalBet.amount,
+        betLabel: getBetLabel(originalBet),
         originalBetId: originalBet.id,
         originalCreatedAt: originalBet.createdAt,
         originalUserName: originalBet.userName,
@@ -359,6 +391,7 @@ function saveAdHocWinner({ winnerName, matchId, betDescription }) {
     key: `manual|${Date.now()}|${normalizeMatchText(normalizedMatch)}|${normalizeMatchText(normalizedBet)}`,
     matchId: normalizedMatch,
     amount: normalizedAmount,
+    betLabel: CURRENT_BET_LABEL,
     originalUserName: normalizedBet,
     counterUserName: '',
     betDescription: normalizedBet,
@@ -510,6 +543,7 @@ function buildBetHistoryRow(bet, action) {
     matchId: bet.matchId,
     teamName: bet.teamName,
     amount: bet.amount,
+    betLabel: getBetLabel(bet),
     createdAt: bet.createdAt,
     responseTo: bet.responseTo || null,
     countered: Boolean(bet.countered),
@@ -551,6 +585,7 @@ function buildDuelHistoryRow(originalBet, counterBet) {
     counterBetId: counterBet?.id || null,
     matchId: originalBet.matchId,
     amount: originalBet.amount,
+    betLabel: getBetLabel(originalBet),
     originalUserName: originalBet.userName,
     originalTeamName: originalBet.teamName,
     counterUserName: counterBet?.userName || originalBet.counteredBy || null,
@@ -604,6 +639,7 @@ function seedDuelHistoryFromLegacyRows() {
         matchId: originalRow.matchId,
         teamName: originalRow.teamName,
         amount: originalRow.amount,
+        betLabel: originalRow.betLabel,
         createdAt: originalRow.createdAt,
         countered: true,
         counteredBy: counterRow.userName
@@ -615,6 +651,7 @@ function seedDuelHistoryFromLegacyRows() {
         matchId: counterRow.matchId,
         teamName: counterRow.teamName,
         amount: counterRow.amount,
+        betLabel: counterRow.betLabel || originalRow.betLabel,
         createdAt: counterRow.createdAt,
         responseTo: counterRow.responseTo
       }
@@ -630,6 +667,7 @@ function getBetHistoryForResponse() {
     .filter((row) => row.action === 'duel')
     .map((row) => ({
       ...row,
+      betLabel: getBetLabel(row),
       active: activeIds.has(row.originalBetId || row.betId) || activeIds.has(row.counterBetId)
     }))
     .sort((first, second) => new Date(second.createdAt || second.recordedAt || 0) - new Date(first.createdAt || first.recordedAt || 0));
@@ -639,7 +677,7 @@ function getWinnerRowsForResponse() {
   const activeRows = buildWinnerRows();
   const historyKeys = new Set(winnerHistory.map((row) => row.key));
   const pendingRows = activeRows.filter((row) => !historyKeys.has(row.key));
-  return [...winnerHistory, ...pendingRows];
+  return [...winnerHistory, ...pendingRows].map(withBetLabel);
 }
 
 function hasSavedWinnerForNotification(notification) {
@@ -688,7 +726,7 @@ async function getVisibleNotifications() {
 
   return checks
     .filter(({ notification, finished }) => !finished && !hasSavedWinnerForNotification(notification))
-    .map(({ notification }) => notification);
+    .map(({ notification }) => withBetLabel(notification));
 }
 
 function validatePin(pin) {
@@ -995,7 +1033,7 @@ app.get('/api/participants', (_req, res) => {
       id: user.id,
       name: user.name,
       totalBets: userBets.length,
-      latestBet: userBets[userBets.length - 1] || null
+      latestBet: userBets[userBets.length - 1] ? withBetLabel(userBets[userBets.length - 1]) : null
     };
   });
 
@@ -1034,6 +1072,7 @@ app.post('/api/bets', async (req, res) => {
     matchId: matchText,
     teamName: teamText,
     amount: amountValue,
+    betLabel: CURRENT_BET_LABEL,
     createdAt: new Date().toISOString(),
     type: 'original',
     countered: false
@@ -1048,6 +1087,7 @@ app.post('/api/bets', async (req, res) => {
     matchId: bet.matchId,
     teamName: bet.teamName,
     amount: bet.amount,
+    betLabel: bet.betLabel,
     message: `${user.name} creÃ³ una apuesta y estÃ¡ esperando respuesta. Puedes responder o ignorar.`,
     createdAt: bet.createdAt,
     originalBetId: bet.id,
@@ -1106,6 +1146,7 @@ app.post('/api/counter-bets', async (req, res) => {
   }
 
   const amountValue = Number(originalBet.amount);
+  const betLabel = getBetLabel(originalBet);
 
   const counterBet = {
     id: Date.now().toString(),
@@ -1113,6 +1154,7 @@ app.post('/api/counter-bets', async (req, res) => {
     matchId: originalBet.matchId,
     teamName: teamText,
     amount: amountValue,
+    betLabel,
     createdAt: new Date().toISOString(),
     type: 'counter',
     responseTo: challengeId
@@ -1128,6 +1170,7 @@ app.post('/api/counter-bets', async (req, res) => {
   if (originalNotification) {
     originalNotification.countered = true;
     originalNotification.counteredBy = user.name;
+    originalNotification.betLabel = betLabel;
     originalNotification.counterTeamName = counterBet.teamName;
   }
 
@@ -1142,6 +1185,7 @@ app.post('/api/counter-bets', async (req, res) => {
     counterUserName: counterBet.userName,
     counterTeamName: counterBet.teamName,
     amount: counterBet.amount,
+    betLabel,
     message: `${originalBet.userName} vs ${user.name}`,
     createdAt: counterBet.createdAt,
     originalBetId: challengeId,
@@ -1158,7 +1202,7 @@ app.post('/api/counter-bets', async (req, res) => {
 
 app.get('/api/results', (_req, res) => {
   res.json({
-    winners: winnerHistory
+    winners: winnerHistory.map(withBetLabel)
   });
 });
 
