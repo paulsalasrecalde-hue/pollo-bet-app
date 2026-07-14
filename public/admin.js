@@ -24,7 +24,7 @@ const betHistoryList = document.getElementById('bet-history-list');
 let adminCode = '';
 let pinRequestTimer = null;
 const FIXED_BET_AMOUNT = 1;
-const FIXED_BET_LABEL = 'Cuarto de Pollo';
+const FIXED_BET_LABEL = 'Medio Pollo';
 
 function renderWinnerOptions(winners) {
   const selectedBet = winnerBetSelect.value;

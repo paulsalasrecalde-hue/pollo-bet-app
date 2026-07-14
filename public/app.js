@@ -28,7 +28,7 @@ const pinRequestPin = document.getElementById('pin-request-pin');
 const sendPinRequestBtn = document.getElementById('send-pin-request-btn');
 
 const FIXED_BET_AMOUNT = 1;
-const FIXED_BET_LABEL = 'Cuarto de Pollo';
+const FIXED_BET_LABEL = 'Medio Pollo';
 
 let currentUserName = '';
 let currentChallengeId = null;
